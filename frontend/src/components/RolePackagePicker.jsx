@@ -11,6 +11,8 @@
  *   onPick(pkg)
  *   onClose()
  */
+import { balanceTone, roleBalanceScore } from '../lib/roleCatalog.js';
+
 export default function RolePackagePicker({ open, packages = [], activeId, onPick, onClose }) {
   if (!open) return null;
   return (
@@ -39,6 +41,7 @@ export default function RolePackagePicker({ open, packages = [], activeId, onPic
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto pr-1">
           {packages.map((pkg) => {
             const total = Object.values(pkg.counts || {}).reduce((a, b) => a + b, 0);
+            const score = roleBalanceScore(pkg.counts);
             return (
               <button
                 key={pkg.id}
@@ -55,6 +58,9 @@ export default function RolePackagePicker({ open, packages = [], activeId, onPic
                   <span className="font-label-sm text-[10px] text-surface-tint tracking-widest tabular-nums">
                     {total} VAI
                   </span>
+                </div>
+                <div className={`font-label-sm text-[10px] ${balanceTone(score)} uppercase tracking-widest mt-1`}>
+                  Điểm cân bằng: {score > 0 ? `+${score}` : score}
                 </div>
                 <div className="font-label-sm text-[11px] text-on-surface-variant leading-tight mt-1">
                   {pkg.desc}

@@ -4,7 +4,7 @@ import AvatarCircle from '../components/AvatarCircle.jsx';
 import DevPanel from '../components/DevPanel.jsx';
 import { PLAYER_STATUS } from '../lib/contracts.js';
 import {
-  ROLE_PACKAGES, ROLE_META, ALL_ROLES, TEAM_COLOR, TEAM_LABEL,
+  ROLE_PACKAGES, ROLE_META, ALL_ROLES, TEAM_COLOR, TEAM_LABEL, balanceTone, roleBalanceScore,
 } from '../lib/roleCatalog.js';
 import RoleAddPicker from '../components/RoleAddPicker.jsx';
 import RolePackagePicker from '../components/RolePackagePicker.jsx';
@@ -56,6 +56,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
   const inviteLink = `http://localhost:3000/?room=${code}`;
   const totalRoles = Object.values(roleCounts).reduce((a, b) => a + b, 0);
   const balanced = totalRoles === seats.length || seats.length === 0;
+  const balanceScore = roleBalanceScore(roleCounts);
 
   const chosen = Object.entries(roleCounts)
     .filter(([, n]) => n > 0)
@@ -221,9 +222,14 @@ export default function WaitingRoom({ onStart, onLeave }) {
                 <span className="material-symbols-outlined text-surface-tint">badge</span>
                 <h3 className="font-headline-md text-[20px] text-on-surface">Vai trò</h3>
               </div>
-              <span className={`font-label-sm text-label-sm tracking-widest ${balanced ? 'text-surface-tint' : 'text-error'}`}>
-                {seats.length} / {totalRoles || '—'}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className={`font-label-sm text-label-sm tracking-widest ${balanced ? 'text-surface-tint' : 'text-error'}`}>
+                  {seats.length} / {totalRoles || '—'}
+                </span>
+                <span className={`font-label-sm text-[10px] uppercase tracking-widest ${balanceTone(balanceScore)}`}>
+                  Điểm: {balanceScore > 0 ? `+${balanceScore}` : balanceScore}
+                </span>
+              </div>
             </div>
 
             {!isHost && (
@@ -266,7 +272,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
                         )}
                       </div>
                       <div className="font-label-sm text-[10px] text-on-surface-variant leading-tight truncate">
-                        {TEAM_LABEL[meta.team]}
+                        {TEAM_LABEL[meta.team]} · {(meta.points ?? 0) > 0 ? `+${meta.points}` : meta.points ?? 0} điểm
                       </div>
                     </div>
                   </div>

@@ -15,6 +15,46 @@ import { ROLE, TEAM } from './contracts.js';
 
 export const THIRD = 'THIRD';
 
+export const ROLE_POINTS = {
+  [ROLE.SEER]: 7,
+  [ROLE.WITCH]: 4,
+  APPRENTICE_SEER: 4,
+  NURSE: 4,
+  VILLAGE_DRUNK: 4,
+  MARKSMAN: 4,
+  [ROLE.GUARD]: 3,
+  HUNTER: 3,
+  PRIEST: 3,
+  PRINCE: 3,
+  BODYGUARD: 3,
+  ORACLE: 3,
+  ELDER: 2,
+  TROUBLEMAKER: 2,
+  GHOST: 2,
+  [ROLE.VILLAGER]: 1,
+  WOLF_CUB: -8,
+  SERIAL_KILLER: -8,
+  ARSONIST: -8,
+  PLAGUE_DOCTOR: -8,
+  VAMPIRE: -7,
+  [ROLE.WEREWOLF]: -6,
+  HEADHUNTER: -6,
+  ALPHA_WOLF: -6,
+  BOSS_WOLF: -6,
+  LONE_WOLF: -5,
+  DIRE_WOLF: -4,
+  CURSED_WOLF: -3,
+  WOLF_MYSTIC: -3,
+  SORCERER: -3,
+  CUPID: -3,
+  DOPPELGANGER: -2,
+  PACIFIST: -1,
+  EXECUTIONER: -1,
+  JESTER: -1,
+  FOOL: -1,
+  SURVIVOR: 0,
+};
+
 const BASIC = [
   { key: ROLE.VILLAGER, name: 'Dân làng', team: TEAM.VILLAGE, icon: 'person', desc: 'Không kỹ năng. Ban ngày bỏ phiếu treo cổ kẻ tình nghi.' },
   { key: ROLE.WEREWOLF, name: 'Sói', team: TEAM.WEREWOLF, icon: 'pets', desc: 'Mỗi đêm cùng đồng bọn chọn cắn một người.' },
@@ -44,6 +84,7 @@ const ADVANCED = [
   // Phe SÓI
   { key: 'WOLF_SEER', name: 'Sói Tiên tri', team: TEAM.WEREWOLF, icon: 'remove_red_eye', desc: 'Sói có khả năng soi như Tiên tri.' },
   { key: 'ALPHA_WOLF', name: 'Sói đầu đàn', team: TEAM.WEREWOLF, icon: 'pets', desc: 'Một lần biến nạn nhân thành Sói thay vì giết.' },
+  { key: 'BOSS_WOLF', name: 'Sói Trùm', team: TEAM.WEREWOLF, icon: 'crown', desc: 'Thủ lĩnh bầy Sói, được tính như một lợi thế mạnh cho phe Sói.' },
   { key: 'WOLF_CUB', name: 'Sói con', team: TEAM.WEREWOLF, icon: 'child_care', desc: 'Khi chết, đêm sau bầy Sói được cắn 2 người.' },
   { key: 'SHADOW_WOLF', name: 'Sói bóng đêm', team: TEAM.WEREWOLF, icon: 'nights_stay', desc: 'Ẩn khỏi mọi khả năng soi của phe Dân.' },
   { key: 'SORCERER', name: 'Phù thuỷ hắc ám', team: TEAM.WEREWOLF, icon: 'auto_fix_high', desc: 'Mỗi đêm soi tìm Tiên tri để báo cho bầy Sói.' },
@@ -74,13 +115,25 @@ const ADVANCED = [
 export const ROLE_CATALOG = { basic: BASIC, advanced: ADVANCED };
 
 // Mảng phẳng MỌI vai
-export const ALL_ROLES = [...BASIC, ...ADVANCED];
+export const ALL_ROLES = [...BASIC, ...ADVANCED].map((r) => ({
+  ...r,
+  points: ROLE_POINTS[r.key] ?? 0,
+}));
 
 // Map nhanh key -> meta
 export const ROLE_META = ALL_ROLES.reduce((acc, r) => { acc[r.key] = r; return acc; }, {});
 
 // Gói đề xuất theo số người
 export const ROLE_PACKAGES = [
+  { id: 'matchmaking8', name: 'Ghép trận 8 người', size: 8,
+    desc: 'Tiên tri · Bảo vệ · Phù thuỷ · 3 Sói · 2 Dân',
+    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 3, [ROLE.VILLAGER]: 2 } },
+  { id: 'matchmaking12', name: 'Ghép trận 12 người', size: 12,
+    desc: 'Tiên tri · Bảo vệ · Thợ săn · Cupid · Phù thuỷ · 3 Sói · Sói con · 3 Dân',
+    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, HUNTER: 1, CUPID: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 3, WOLF_CUB: 1, [ROLE.VILLAGER]: 3 } },
+  { id: 'matchmaking15', name: 'Ghép trận 15 người', size: 15,
+    desc: 'Tiên tri · Bảo vệ · Thợ săn · Cupid · Phù thủy · 3 Sói · Sói Trùm · Sói con · Tiên tri tập sự · 3 Dân',
+    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, HUNTER: 1, CUPID: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 3, BOSS_WOLF: 1, WOLF_CUB: 1, APPRENTICE_SEER: 1, [ROLE.VILLAGER]: 3 } },
   { id: 'classic6', name: 'Cổ điển 6 người', size: 6,
     desc: '2 Sói · Tiên tri · Bảo vệ · 2 Dân',
     counts: { [ROLE.WEREWOLF]: 2, [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.VILLAGER]: 2 } },
@@ -88,6 +141,17 @@ export const ROLE_PACKAGES = [
     desc: '2 Sói · Tiên tri · Bảo vệ · Phù thuỷ · 3 Dân',
     counts: { [ROLE.WEREWOLF]: 2, [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.WITCH]: 1, [ROLE.VILLAGER]: 3 } },
 ];
+
+export function roleBalanceScore(counts = {}) {
+  return Object.entries(counts).reduce(
+    (sum, [key, count]) => sum + (ROLE_POINTS[key] ?? 0) * count,
+    0,
+  );
+}
+
+export function balanceTone(score) {
+  return Math.abs(score) <= 2 ? 'text-surface-tint' : 'text-error';
+}
 
 export const TEAM_COLOR = {
   [TEAM.VILLAGE]: 'text-surface-tint border-surface-tint/40',

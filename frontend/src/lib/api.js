@@ -5,7 +5,18 @@
  * http://localhost:4000, đổi được qua VITE_BACKEND_URL.
  */
 export const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+  import.meta.env.VITE_BACKEND_URL || 'http://localhost:3636';
+
+async function fetchBackend(path, options) {
+  const url = `${BACKEND_URL}${path}`;
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    throw new Error(
+      `Khong ket noi duoc backend tai ${BACKEND_URL}. Hay chay backend hoac kiem tra VITE_BACKEND_URL.`,
+    );
+  }
+}
 
 async function asJson(res) {
   const text = await res.text();
@@ -27,9 +38,7 @@ async function asJson(res) {
  * → { nonce, message } — client phải ký đúng `message` này.
  */
 export async function getNonce(wallet) {
-  const res = await fetch(
-    `${BACKEND_URL}/auth/nonce?wallet=${encodeURIComponent(wallet)}`,
-  );
+  const res = await fetchBackend(`/auth/nonce?wallet=${encodeURIComponent(wallet)}`);
   return asJson(res); // { nonce, message }
 }
 
@@ -38,7 +47,7 @@ export async function getNonce(wallet) {
  * → { token, wallet }
  */
 export async function verifySignature({ wallet, signature, message }) {
-  const res = await fetch(`${BACKEND_URL}/auth/verify`, {
+  const res = await fetchBackend('/auth/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ wallet, signature, message }),

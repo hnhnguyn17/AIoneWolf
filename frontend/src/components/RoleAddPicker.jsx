@@ -142,6 +142,15 @@ export default function RoleAddPicker({
                   <div className="flex-1 min-w-0">
                     <div className="font-body-md text-[18px] text-on-surface flex items-center gap-2">
                       {r.name}
+                      <span className={`font-label-sm text-[10px] px-1.5 py-0.5 rounded border ${
+                        (r.points ?? 0) > 0
+                          ? 'border-surface-tint/40 text-surface-tint'
+                          : (r.points ?? 0) < 0
+                            ? 'border-error/40 text-error'
+                            : 'border-outline-variant/40 text-on-surface-variant'
+                      }`}>
+                        {(r.points ?? 0) > 0 ? `+${r.points}` : r.points ?? 0}
+                      </span>
                       {r.wip && (
                         <span className="font-label-sm text-[10px] px-1.5 py-0.5 rounded bg-on-tertiary-container/30 text-on-tertiary-container uppercase">
                           beta
