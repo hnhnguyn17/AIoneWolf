@@ -42,10 +42,13 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
       setPending(null);
       onEnterWaiting?.();
     }
-    function onCreated() {
+    function onCreated(state) {
+      socket._isCreated = true;
+      if (state) socket._lastRoomState = { ...(socket._lastRoomState || {}), ...state };
       go(); // TẠO PHÒNG xong → vào phòng chờ.
     }
-    function onRoomState() {
+    function onRoomState(state) {
+      if (state) socket._lastRoomState = { ...(socket._lastRoomState || {}), ...state };
       // THAM GIA: nhận room:state sau khi bấm Join → vào phòng chờ.
       if (pending === 'join') go();
     }

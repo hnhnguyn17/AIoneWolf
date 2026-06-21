@@ -208,12 +208,15 @@ class GameRoom {
   // ─── Snapshot ─────────────────────────────────────────────
   /** State công khai gửi cho FE — ẩn role của người khác. */
   getPublicState() {
+    const host = this.players.find((p) => p.id === this.moderatorId);
     return {
       roomCode: this.roomCode,
+      hostSeat: host ? host.seat : 1,
       phase: this.phase,
       cycle: this.cycle,
       winner: this.winner,
       players: this.players.map((p) => ({
+        id: p.id,
         seat: p.seat,
         name: p.name,
         wallet: p.wallet,

@@ -188,6 +188,17 @@ function registerHandlers(io) {
       });
     });
 
+    // ── Dev Tools (chỉ chạy nội bộ) ──
+    socket.on('dev:fill_bots', ({ count } = {}) => {
+      const room = rooms.getRoom(socket.data.roomCode);
+      if (!room) return;
+      // Chỉ host mới có quyền fill bots
+      if (room.moderatorId !== socket.id) return socket.emit(S2C.ERROR, 'Chỉ Quản trò mới dùng được lệnh này.');
+      fillBots(room, count || 8);
+      syncRoomToDb(room);
+      io.to(room.roomCode).emit(S2C.ROOM_STATE, room.getPublicState());
+    });
+
     socket.on('disconnect', () => cleanup(socket));
   });
 

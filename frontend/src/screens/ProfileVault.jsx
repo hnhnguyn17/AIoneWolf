@@ -16,13 +16,20 @@ import { WalletButton } from '../components/WalletButton.jsx';
 import { getMe, getSolPrice, getSolBalance } from '../lib/api.js';
 import { rankProgress } from '../lib/rank.js';
 
+import img1 from '../../assets/image.png';
+import img2 from '../../assets/image copy.png';
+import img3 from '../../assets/image copy 2.png';
+import img4 from '../../assets/image copy 3.png';
+import img5 from '../../assets/image copy 4.png';
+import img6 from '../../assets/nft/artifact-1.png';
+
 const NFTS = [
-  { id: 1, name: 'Cranial Node Alpha', rarity: 'LEGENDARY', seed: 'skull' },
-  { id: 2, name: 'Obsidian Visage', rarity: 'EPIC', seed: 'mask' },
-  { id: 3, name: 'Neon Wraith', rarity: 'RARE', seed: 'wraith' },
-  { id: 4, name: 'Static Phantom', rarity: 'RARE', seed: 'static' },
-  { id: 5, name: 'Hollow Sentinel', rarity: 'EPIC', seed: 'sentinel' },
-  { id: 6, name: 'Glass Oracle', rarity: 'COMMON', seed: 'oracle' },
+  { id: 1, name: 'Cranial Node Alpha', rarity: 'LEGENDARY', img: img1 },
+  { id: 2, name: 'Obsidian Visage', rarity: 'EPIC', img: img2 },
+  { id: 3, name: 'Neon Wraith', rarity: 'RARE', img: img3 },
+  { id: 4, name: 'Static Phantom', rarity: 'RARE', img: img4 },
+  { id: 5, name: 'Hollow Sentinel', rarity: 'EPIC', img: img5 },
+  { id: 6, name: 'Glass Oracle', rarity: 'COMMON', img: img6 },
 ];
 
 const NFT_IMG = (seed) =>
@@ -219,7 +226,7 @@ export default function ProfileVault({ onBack }) {
                     {nft.rarity}
                   </div>
                   <img
-                    src={NFT_IMG(nft.seed)}
+                    src={nft.img}
                     alt={nft.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />

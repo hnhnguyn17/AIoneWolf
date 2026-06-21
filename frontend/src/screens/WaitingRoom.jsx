@@ -1,194 +1,164 @@
-/**
- * src/screens/WaitingRoom.jsx
- * ─────────────────────────────────────────────────────────────
- * Phòng chờ kiểu Liên Quân (lobby trước trận):
- *   - VÒNG TRÒN avatar người chơi (AvatarCircle) quanh tâm "Vực Thẳm".
- *   - Mã phòng + nút copy LINK MỜI (http://localhost:3000/?room=MÃ) và nút
- *     "Mời kênh Thế Giới" (giả lập).
- *   - Danh sách người chơi (host được đánh dấu).
- *   - Ô chỉnh SỐ LƯỢNG từng ROLE — mặc định theo ROLE_PRESETS theo số người;
- *     CHỦ PHÒNG sửa được (+/-), người thường chỉ xem.
- *   - Nút "BẮT ĐẦU" CHỈ chủ phòng thấy → emit C2S.GAME_START.
- *
- * Nghe S2C.ROOM_STATE / ROOM_CREATED để cập nhật danh sách + xác định host.
- * Ở chế độ MOCK, mockServer phát room:created → room:state nên vào là thấy ngay.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { getSocket, isMock, C2S, S2C } from '../lib/socket.js';
 import AvatarCircle from '../components/AvatarCircle.jsx';
 import DevPanel from '../components/DevPanel.jsx';
-import { ROLE, ROLE_LABEL, ROLE_PRESETS, PLAYER_STATUS } from '../lib/contracts.js';
-import { ROLE_CATALOG, ROLE_PACKAGES, ROLE_META, TEAM_COLOR } from '../lib/roleCatalog.js';
+import { PLAYER_STATUS } from '../lib/contracts.js';
+import {
+  ROLE_PACKAGES, ROLE_META, ALL_ROLES, TEAM_COLOR, TEAM_LABEL,
+} from '../lib/roleCatalog.js';
+import RoleAddPicker from '../components/RoleAddPicker.jsx';
+import RolePackagePicker from '../components/RolePackagePicker.jsx';
 
-const SELF_ID = 'p1'; // ở mock, "self" là p1 (khớp mockServer).
-const ALL_ROLES = [ROLE.WEREWOLF, ROLE.SEER, ROLE.GUARD, ROLE.WITCH, ROLE.VILLAGER];
-
-/** Đếm số lượng mỗi role từ preset theo số người chơi (clamp 4..8). */
-function presetCounts(playerCount) {
-  const keys = Object.keys(ROLE_PRESETS).map(Number);
-  const min = Math.min(...keys);
-  const max = Math.max(...keys);
-  const n = Math.max(min, Math.min(max, playerCount || 6));
-  const preset = ROLE_PRESETS[n] || ROLE_PRESETS[6];
-  const counts = {};
-  for (const r of ALL_ROLES) counts[r] = 0;
-  for (const r of preset) counts[r] = (counts[r] || 0) + 1;
-  return counts;
-}
+const SELF_ID = 'p1';
 
 export default function WaitingRoom({ onStart, onLeave }) {
   const socket = useMemo(() => getSocket(), []);
-  const [room, setRoom] = useState(null); // { code, players, hostId }
-  const [roleCounts, setRoleCounts] = useState(() => presetCounts(6));
-  const [touchedRoles, setTouchedRoles] = useState(false);
+  const [room, setRoom] = useState(() => socket._lastRoomState || null);
+  const [roleCounts, setRoleCounts] = useState(() => ({ ...ROLE_PACKAGES[0].counts }));
+  const [activePackage, setActivePackage] = useState(ROLE_PACKAGES[0].id);
+  const [isCreated, setICreated] = useState(() => socket._isCreated || false);
   const [copied, setCopied] = useState(false);
-  const [worldInvited, setWorldInvited] = useState(false);
-  const [roleTab, setRoleTab] = useState('basic'); // 'basic' | 'advanced'
-  const [activePackage, setActivePackage] = useState(null);
+
+  const [pkgOpen, setPkgOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     function onRoomState(state) {
-      setRoom(state);
-      // Khi chủ phòng CHƯA chỉnh tay → đồng bộ role theo số người hiện tại.
-      if (!touchedRoles && Array.isArray(state?.players)) {
-        setRoleCounts(presetCounts(state.players.length));
-      }
+      setRoom((cur) => ({ ...(cur || {}), ...state }));
     }
     function onCreated(state) {
-      // room:created — đảm bảo có room ngay cả khi room:state tới sau.
+      setICreated(true);
       setRoom((cur) => ({ ...(cur || {}), ...state }));
     }
     socket.on(S2C.ROOM_STATE, onRoomState);
     socket.on(S2C.ROOM_CREATED, onCreated);
-
-    // Mock: bơm lobby state để vào là thấy người chơi.
     if (isMock()) socket._bootstrapLobby?.();
-
     return () => {
       socket.off(S2C.ROOM_STATE, onRoomState);
       socket.off(S2C.ROOM_CREATED, onCreated);
     };
-  }, [socket, touchedRoles]);
+  }, [socket]);
 
-  const seats = (room?.players || []).map((p) => ({
-    ...p,
+  const seats = (room?.players || []).map((p, i) => ({
+    id: p.id || `seat-${p.seat ?? i + 1}`,
+    seat: p.seat ?? i + 1,
+    name: p.name || `Player_${i + 1}`,
+    avatar: p.avatar,
+    wallet: p.wallet,
+    self: p.id ? (isMock() ? p.id === SELF_ID : p.id === socket.id) : p.seat === room?.selfSeat,
     status: PLAYER_STATUS.ALIVE,
   }));
-  const code = room?.code || (isMock() ? 'ABYSS1' : '------');
-  const hostId = room?.hostId || SELF_ID;
-  const isHost = hostId === SELF_ID;
+
+  const code = room?.roomCode || room?.code || (isMock() ? 'ABYSS1' : '------');
+  const hostSeat = room?.hostSeat ?? 1;
+  const isHost = isMock() ? (room?.hostId || SELF_ID) === SELF_ID : isCreated;
 
   const inviteLink = `http://localhost:3000/?room=${code}`;
   const totalRoles = Object.values(roleCounts).reduce((a, b) => a + b, 0);
+  const balanced = totalRoles === seats.length || seats.length === 0;
+
+  const chosen = Object.entries(roleCounts)
+    .filter(([, n]) => n > 0)
+    .map(([key, n]) => ({ key, n, meta: ROLE_META[key] }))
+    .filter((r) => r.meta);
 
   function copyInvite() {
-    const done = () => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    };
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1800); };
     try {
       const p = navigator.clipboard?.writeText(inviteLink);
-      if (p?.then) p.then(done, done);
-      else done();
-    } catch {
-      done();
-    }
-  }
-
-  function inviteWorld() {
-    // Giả lập: gọi kênh thế giới (sau này nối backend / chat global).
-    setWorldInvited(true);
-    setTimeout(() => setWorldInvited(false), 2200);
-    // eslint-disable-next-line no-console
-    console.log('%c[world-invite]', 'color:#7318ff', inviteLink);
+      if (p?.then) p.then(done, done); else done();
+    } catch { done(); }
   }
 
   function bump(role, delta) {
     if (!isHost) return;
-    setTouchedRoles(true);
-    setActivePackage(null); // chỉnh tay → bỏ đánh dấu gói
-    setRoleCounts((prev) => ({
-      ...prev,
-      [role]: Math.max(0, (prev[role] || 0) + delta),
-    }));
+    setActivePackage(null);
+    setRoleCounts((prev) => {
+      const next = { ...prev, [role]: Math.max(0, (prev[role] || 0) + delta) };
+      if (next[role] === 0) delete next[role];
+      return next;
+    });
   }
 
-  /** Áp 1 gói đề xuất → set thẳng roleCounts. */
   function applyPackage(pkg) {
     if (!isHost) return;
-    setTouchedRoles(true);
     setActivePackage(pkg.id);
     setRoleCounts({ ...pkg.counts });
+    setPkgOpen(false);
+  }
+
+  function handleAddRoles(keys) {
+    if (!isHost) return;
+    setActivePackage(null);
+    setRoleCounts((prev) => {
+      const next = { ...prev };
+      for (const k of keys) {
+        next[k] = (next[k] || 0) + 1;
+      }
+      return next;
+    });
+    setAddOpen(false);
   }
 
   function start() {
-    // Gửi cấu hình role kèm theo (backend thật có thể dùng); mock chỉ cần event.
     socket.emit(C2S.GAME_START, { code, roles: roleCounts });
     onStart?.();
   }
 
   return (
     <div className="min-h-screen w-full text-on-surface relative overflow-hidden">
-      {/* Nền rừng cố định + phủ tối */}
       <div className="forest-bg" />
       <div className="forest-overlay-night" />
       <div className="scanlines opacity-30" />
 
-      {/* Top bar */}
-      <header className="relative z-10 w-full max-w-container-max mx-auto flex justify-between items-center p-margin-mobile md:px-margin-desktop md:py-stack-lg">
+      <header className="relative z-10 w-full max-w-[1700px] mx-auto flex justify-between items-center px-margin-mobile md:px-margin-desktop pt-8 md:pt-10">
         <button
           onClick={onLeave}
-          className="flex items-center gap-2 text-on-surface-variant hover:text-surface-tint transition-colors font-button text-button uppercase tracking-widest"
+          className="flex items-center gap-2 text-on-surface-variant hover:text-surface-tint transition-colors font-button text-button uppercase tracking-widest z-20"
         >
           <span className="material-symbols-outlined">arrow_back</span>
           <span className="hidden md:inline">Rời phòng</span>
         </button>
-        <h1 className="font-display-lg-mobile text-primary uppercase tracking-tighter drop-shadow-[0_0_15px_rgba(0,219,231,0.5)]">
-          VOIR_ABYSS
-        </h1>
-        <div className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
-          {isMock() ? 'MODE: MOCK' : 'WAITING ROOM'}
+        
+        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
+          <h1 className="font-display-lg text-[24px] md:text-[40px] text-surface-tint uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(0,219,231,0.5)] whitespace-nowrap">
+            Echoes of the Lycan
+          </h1>
+          <span className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-[0.3em] mt-1">
+            Phòng Chờ
+          </span>
+        </div>
+
+        <div className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-widest z-20">
+          {isMock() ? 'MODE: MOCK' : isHost ? 'CHỦ PHÒNG' : 'WAITING ROOM'}
         </div>
       </header>
 
-      <main className="relative z-10 w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop pb-stack-lg flex flex-col xl:flex-row gap-gutter">
-        {/* LEFT: Vòng tròn avatar */}
-        <section className="flex-1 flex flex-col items-center">
-          {/* Mã phòng + mời */}
-          <div className="glass-panel rounded-xl px-6 py-4 mb-6 flex flex-col sm:flex-row items-center gap-4 w-full max-w-xl">
+      <main className="relative z-10 w-full max-w-[1700px] mx-auto px-margin-mobile md:px-margin-desktop mt-8 md:mt-12 pb-stack-lg flex flex-col xl:flex-row gap-gutter">
+        <aside className="w-full xl:w-64 flex flex-col justify-center gap-gutter shrink-0">
+          <div className="glass-panel rounded-xl px-4 py-5 flex flex-col gap-5">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-surface-tint">tag</span>
               <div>
                 <div className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest">
                   Mã phòng
                 </div>
-                <div className="font-headline-md text-[26px] text-primary tracking-[0.3em]">
+                <div className="font-headline-md font-mono text-[22px] text-primary tracking-[0.2em] -mr-[0.2em]">
                   {code}
                 </div>
               </div>
             </div>
-            <div className="flex-1" />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={copyInvite}
-                className="flex items-center gap-2 border border-surface-tint text-surface-tint font-button text-button px-4 py-2 rounded uppercase tracking-widest hover:bg-surface-tint/10 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {copied ? 'check' : 'link'}
-                </span>
-                {copied ? 'Đã copy' : 'Copy link mời'}
-              </button>
-              <button
-                onClick={inviteWorld}
-                className="flex items-center gap-2 border border-on-tertiary-container/60 text-on-tertiary-container font-button text-button px-4 py-2 rounded uppercase tracking-widest hover:bg-on-tertiary-container/10 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px]">public</span>
-                {worldInvited ? 'Đã gửi' : 'Kênh thế giới'}
-              </button>
-            </div>
+            <button
+              onClick={copyInvite}
+              className="flex items-center justify-center gap-2 border border-surface-tint text-surface-tint font-button text-button px-4 py-2 rounded uppercase tracking-widest hover:bg-surface-tint/10 transition-colors w-full"
+            >
+              <span className="material-symbols-outlined text-[18px]">{copied ? 'check' : 'link'}</span>
+              {copied ? 'Đã copy' : 'Copy link mời'}
+            </button>
           </div>
+        </aside>
 
-          {/* Vòng tròn — tổng ghế = số role cấu hình (totalRoles); ghế dư = chờ người */}
+        <section className="flex-1 relative flex items-center justify-center min-h-[600px]">
           <AvatarCircle
             players={seats}
             seats={totalRoles}
@@ -208,9 +178,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
           />
         </section>
 
-        {/* RIGHT: danh sách + role config + start */}
-        <aside className="w-full xl:w-96 flex flex-col gap-gutter">
-          {/* Danh sách người chơi */}
+        <aside className="w-full xl:w-[450px] shrink-0 flex flex-col gap-gutter">
           <div className="glass-panel rounded-xl p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
               <div className="flex items-center gap-2">
@@ -222,156 +190,109 @@ export default function WaitingRoom({ onStart, onLeave }) {
               </span>
             </div>
             <ul className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+              {seats.length === 0 && (
+                <li className="font-label-sm text-[11px] text-on-surface-variant text-center py-4 uppercase tracking-widest">
+                  Chưa có người chơi
+                </li>
+              )}
               {seats.map((p, i) => (
-                <li
-                  key={p.id}
-                  className="flex items-center gap-3 p-2 rounded border border-outline-variant/20 bg-void/40"
-                >
+                <li key={p.id} className="flex items-center gap-3 p-2 rounded border border-outline-variant/20 bg-void/40">
                   <div className="w-9 h-9 rounded-full overflow-hidden border border-surface-tint/40 shrink-0">
-                    {p.avatar ? (
-                      <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-surface-container-high" />
-                    )}
+                    {p.avatar
+                      ? <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full bg-surface-container-high" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-body-md text-on-surface truncate text-[14px]">
-                      {p.name}
-                      {p.self ? ' (Bạn)' : ''}
+                      {p.name}{p.self ? ' (Bạn)' : ''}
                     </div>
                   </div>
-                  <span
-                    className={`font-label-sm text-[10px] uppercase tracking-widest ${
-                      hostId === p.id ? 'text-primary' : 'text-on-surface-variant'
-                    }`}
-                  >
-                    {hostId === p.id ? 'Chủ phòng' : `P${i + 1}`}
+                  <span className={`font-label-sm text-[10px] uppercase tracking-widest ${p.seat === hostSeat ? 'text-primary' : 'text-on-surface-variant'}`}>
+                    {p.seat === hostSeat ? 'Chủ phòng' : `P${i + 1}`}
                   </span>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Cấu hình role */}
           <div className="glass-panel rounded-xl p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-surface-tint">badge</span>
                 <h3 className="font-headline-md text-[20px] text-on-surface">Vai trò</h3>
               </div>
-              <span
-                className={`font-label-sm text-label-sm tracking-widest ${
-                  totalRoles === seats.length || seats.length === 0
-                    ? 'text-surface-tint'
-                    : 'text-error'
-                }`}
-              >
-                {totalRoles} / {seats.length || '—'}
+              <span className={`font-label-sm text-label-sm tracking-widest ${balanced ? 'text-surface-tint' : 'text-error'}`}>
+                {seats.length} / {totalRoles || '—'}
               </span>
             </div>
+
             {!isHost && (
               <p className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest">
                 Chỉ chủ phòng chỉnh được số lượng vai.
               </p>
             )}
 
-            {/* GÓI ĐỀ XUẤT — chọn nhanh */}
-            <div>
-              <p className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest mb-2">
-                Gói đề xuất
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {ROLE_PACKAGES.map((pkg) => (
-                  <button
-                    key={pkg.id}
-                    disabled={!isHost}
-                    onClick={() => applyPackage(pkg)}
-                    title={pkg.desc}
-                    className={`text-left p-2 rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                      activePackage === pkg.id
-                        ? 'border-surface-tint bg-surface-tint/10 text-surface-tint'
-                        : 'border-outline-variant/30 bg-void/30 text-on-surface-variant hover:border-surface-tint/50'
-                    }`}
-                  >
-                    <div className="font-body-md text-[13px] text-on-surface">{pkg.name}</div>
-                    <div className="font-label-sm text-[10px] opacity-80 leading-tight mt-0.5">
-                      {pkg.desc}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              disabled={!isHost}
+              onClick={() => setPkgOpen(true)}
+              className="flex items-center justify-between p-3 rounded-lg border border-outline-variant/30 bg-void/30 hover:border-surface-tint/50 transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="flex items-center gap-2 text-on-surface">
+                <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+                <span className="font-button text-button normal-case">Gói đề xuất</span>
+              </span>
+              <span className="font-label-sm text-[10px] uppercase tracking-widest opacity-80">
+                {activePackage ? (ROLE_PACKAGES.find((p) => p.id === activePackage)?.name || 'tuỳ chỉnh') : 'tuỳ chỉnh'}
+              </span>
+            </button>
 
-            {/* TABS: Cơ bản / Nâng cao */}
-            <div className="flex gap-1 border-b border-outline-variant/30 mt-1">
-              {[
-                { id: 'basic', label: 'Cơ bản' },
-                { id: 'advanced', label: 'Nâng cao' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setRoleTab(t.id)}
-                  className={`px-3 py-1.5 font-label-sm text-label-sm uppercase tracking-widest border-b-2 -mb-px transition-colors ${
-                    roleTab === t.id
-                      ? 'border-surface-tint text-surface-tint'
-                      : 'border-transparent text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* DANH SÁCH ROLE theo tab */}
-            <ul className="flex flex-col gap-2 max-h-[320px] overflow-y-auto pr-1">
-              {ROLE_CATALOG[roleTab].map((r) => (
-                <li
-                  key={r.key}
-                  className="flex items-center justify-between gap-2 p-2 rounded border border-outline-variant/20 bg-void/30"
-                >
+            <ul className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              {chosen.length === 0 && (
+                <li className="font-label-sm text-[11px] text-on-surface-variant text-center py-4 uppercase tracking-widest">
+                  Chưa có vai — chọn gói hoặc bấm (+)
+                </li>
+              )}
+              {chosen.map(({ key, n, meta }) => (
+                <li key={key} className="flex items-center justify-between gap-2 p-2 rounded border border-outline-variant/20 bg-void/30 min-w-0">
                   <div className="flex items-start gap-2 min-w-0">
-                    <span className={`material-symbols-outlined text-[18px] mt-0.5 ${TEAM_COLOR[r.team]?.split(' ')[0] || 'text-surface-tint'}`}>
-                      {r.icon}
+                    <span className={`material-symbols-outlined text-[18px] mt-0.5 ${TEAM_COLOR[meta.team]?.split(' ')[0] || 'text-surface-tint'}`}>
+                      {meta.icon}
                     </span>
                     <div className="min-w-0">
                       <div className="font-body-md text-[14px] text-on-surface flex items-center gap-1">
-                        {r.name}
-                        {r.wip && (
-                          <span className="font-label-sm text-[8px] px-1 rounded bg-on-tertiary-container/30 text-on-tertiary-container uppercase">
-                            beta
-                          </span>
+                        {meta.name}
+                        {meta.wip && (
+                          <span className="font-label-sm text-[8px] px-1 rounded bg-on-tertiary-container/30 text-on-tertiary-container uppercase">beta</span>
                         )}
                       </div>
-                      <div className="font-label-sm text-[10px] text-on-surface-variant leading-tight">
-                        {r.desc}
+                      <div className="font-label-sm text-[10px] text-on-surface-variant leading-tight truncate">
+                        {TEAM_LABEL[meta.team]}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      disabled={!isHost}
-                      onClick={() => bump(r.key, -1)}
-                      className="w-7 h-7 rounded border border-outline-variant/50 text-on-surface-variant hover:text-surface-tint hover:border-surface-tint/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
+                    <button disabled={!isHost} onClick={() => bump(key, -1)}
+                      className="w-7 h-7 rounded border border-outline-variant/50 text-on-surface-variant hover:text-surface-tint hover:border-surface-tint/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center">
                       <span className="material-symbols-outlined text-[16px]">remove</span>
                     </button>
-                    <span className="w-5 text-center font-label-sm text-surface-tint tabular-nums">
-                      {roleCounts[r.key] || 0}
-                    </span>
-                    <button
-                      disabled={!isHost}
-                      onClick={() => bump(r.key, +1)}
-                      className="w-7 h-7 rounded border border-outline-variant/50 text-on-surface-variant hover:text-surface-tint hover:border-surface-tint/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
+                    <span className="w-5 text-center font-label-sm text-surface-tint tabular-nums">{n}</span>
+                    <button disabled={!isHost} onClick={() => bump(key, +1)}
+                      className="w-7 h-7 rounded border border-outline-variant/50 text-on-surface-variant hover:text-surface-tint hover:border-surface-tint/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center">
                       <span className="material-symbols-outlined text-[16px]">add</span>
                     </button>
                   </div>
                 </li>
               ))}
+              <li>
+                <button disabled={!isHost} onClick={() => setAddOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded border border-dashed border-outline-variant/50 text-on-surface-variant hover:text-surface-tint hover:border-surface-tint/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  <span className="font-button text-button normal-case">Thêm vai ({ALL_ROLES.length})</span>
+                </button>
+              </li>
             </ul>
           </div>
 
-          {/* Bắt đầu — CHỈ chủ phòng */}
           {isHost ? (
             <button
               onClick={start}
@@ -382,16 +303,29 @@ export default function WaitingRoom({ onStart, onLeave }) {
             </button>
           ) : (
             <div className="w-full py-4 rounded border border-outline-variant/40 text-on-surface-variant font-label-sm text-label-sm uppercase tracking-widest text-center flex items-center justify-center gap-2">
-              <span className="material-symbols-outlined text-[18px] animate-pulse">
-                hourglass_empty
-              </span>
+              <span className="material-symbols-outlined text-[18px] animate-pulse">hourglass_empty</span>
               Chờ chủ phòng bắt đầu…
             </div>
           )}
         </aside>
       </main>
 
-      {/* DEV: fill bots + skip (chỉ hiện ở môi trường dev) */}
+      <RolePackagePicker
+        open={pkgOpen}
+        packages={ROLE_PACKAGES}
+        activeId={activePackage}
+        onPick={applyPackage}
+        onClose={() => setPkgOpen(false)}
+      />
+      <RoleAddPicker
+        open={addOpen}
+        allRoles={ALL_ROLES}
+        teamColor={TEAM_COLOR}
+        teamLabel={TEAM_LABEL}
+        onAdd={handleAddRoles}
+        onClose={() => setAddOpen(false)}
+      />
+
       <DevPanel context="waiting" />
     </div>
   );
