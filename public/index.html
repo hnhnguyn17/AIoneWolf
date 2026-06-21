@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ma Sói - Werewolf Companion</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+            padding: 12px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        h1 { text-align: center; font-size: 1.5em; padding: 16px 0 8px; }
+        h1 .emoji { font-size: 1.3em; }
+        .subtitle { text-align: center; color: #8b949e; font-size: 0.85em; margin-bottom: 16px; }
+
+        /* ─── Cards / Panels ─── */
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+        }
+        .panel h2 { font-size: 1.1em; margin-bottom: 12px; }
+        .panel h3 { font-size: 1em; margin-bottom: 8px; color: #58a6ff; }
+
+        /* ─── Inputs ─── */
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            background: #0d1117;
+            color: #e6edf3;
+            font-size: 16px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: #58a6ff; }
+        input[type="text"]::placeholder { color: #484f58; }
+
+        /* ─── Buttons ─── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #fff;
+            width: 100%;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: #238636; }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-danger { background: #da3633; }
+        .btn-danger:hover { background: #f85149; }
+        .btn-secondary { background: #30363d; }
+        .btn-secondary:hover { background: #484f58; }
+        .btn-purple { background: #8957e5; }
+        .btn-purple:hover { background: #a371f7; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+        .btn-row .btn { width: 50%; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; width: auto; border-radius: 6px; }
+
+        /* ─── Hidden ─── */
+        .hidden { display: none !important; }
+
+        /* ─── Room Code Display ─── */
+        .room-code {
+            font-size: 2.5em;
+            font-weight: 800;
+            letter-spacing: 8px;
+            text-align: center;
+            color: #58a6ff;
+            font-family: 'Courier New', monospace;
+            padding: 8px;
+            background: #0d1117;
+            border-radius: 8px;
+            border: 2px dashed #30363d;
+            margin: 8px 0;
+        }
+        .qr-wrap { text-align: center; margin: 12px 0; }
+        .qr-wrap canvas { border-radius: 8px; background: #fff; padding: 8px; }
+
+        /* ─── Role Counter Grid ─── */
+        .faction-header {
+            font-size: 0.9em;
+            font-weight: 700;
+            padding: 8px 0 4px;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 6px;
+        }
+        .faction-soi { color: #f85149; }
+        .faction-dan { color: #58a6ff; }
+        .faction-trung_lap { color: #d29922; }
+
+        .role-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 4px;
+            border-bottom: 1px solid #21262d;
+        }
+        .role-row:last-child { border-bottom: none; }
+        .role-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+        .role-emoji { font-size: 1.3em; }
+        .role-name { font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .role-counter {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .role-counter button {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid #30363d;
+            background: #21262d;
+            color: #e6edf3;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .role-counter button:active { background: #30363d; }
+        .role-counter .count {
+            width: 24px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1em;
+        }
+        .count-zero { color: #484f58; }
+        .count-active { color: #58a6ff; }
+
+        .toggle-expansion {
+            text-align: center;
+            padding: 8px;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .toggle-expansion:hover { color: #58a6ff; }
+
+        .role-stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 0.9em;
+            color: #8b949e;
+        }
+        .role-stats .match { color: #3fb950; font-weight: 700; }
+        .role-stats .mismatch { color: #f85149; font-weight: 700; }
+
+        /* ─── Player List ─── */
+        .player-list { list-style: none; max-height: 200px; overflow-y: auto; }
+        .player-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #21262d;
+        }
+        .player-item:last-child { border-bottom: none; }
+
+        /* ─── Cheat Sheet ─── */
+        .cheat-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        .cheat-table th { text-align: left; padding: 6px 8px; color: #8b949e; border-bottom: 1px solid #30363d; }
+        .cheat-table td { padding: 6px 8px; border-bottom: 1px solid #21262d; }
+        .cheat-faction-row td { 
+            font-weight: 700; 
+            padding-top: 10px; 
+            border-bottom: 1px solid #30363d;
+            font-size: 0.85em;
+        }
+
+        /* ─── 3D Card Flip (Tap-to-Reveal) ─── */
+        .card-scene {
+            perspective: 800px;
+            width: 220px;
+            height: 320px;
+            margin: 20px auto;
+        }
+        .card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s ease;
+            cursor: pointer;
+        }
+        .card.is-flipped { transform: rotateY(180deg); }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            font-weight: 700;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .card-front {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border: 2px solid #30363d;
+        }
+        .card-front .card-icon { font-size: 4em; margin-bottom: 12px; }
+        .card-front .card-hint { font-size: 0.65em; color: #8b949e; font-weight: 400; margin-top: 12px; }
+        .card-back {
+            background: linear-gradient(135deg, #161b22, #1f2937);
+            border: 2px solid #58a6ff;
+            transform: rotateY(180deg);
+        }
+        .card-back .role-reveal-emoji { font-size: 3em; margin-bottom: 8px; }
+        .card-back .role-reveal-name { font-size: 1.4em; color: #58a6ff; }
+        .card-back .role-reveal-desc {
+            font-size: 0.6em;
+            color: #8b949e;
+            font-weight: 400;
+            margin-top: 10px;
+            padding: 0 16px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .reveal-instruction {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.85em;
+            margin-top: 8px;
+        }
+
+        /* ─── Toast ─── */
+        .toast {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #161b22;
+            border: 1px solid #30363d;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+            max-width: 90%;
+            text-align: center;
+        }
+        .toast.show { opacity: 1; }
+
+        /* ─── Status badge ─── */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        .badge-waiting { background: #1f2937; color: #d29922; border: 1px solid #d29922; }
+        .badge-ready { background: #0f291e; color: #3fb950; border: 1px solid #3fb950; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><span class="emoji">🐺</span> Ma Sói</h1>
+    <p class="subtitle">Werewolf Companion — Thay thế bộ bài giấy</p>
+
+    <!-- ══════════ LOGIN VIEW ══════════ -->
+    <div id="login-view">
+        <div class="panel">
+            <h2>🎮 Bắt đầu chơi</h2>
+            <input type="text" id="nameInput" placeholder="Tên của bạn" autocomplete="off">
+
+            <button class="btn btn-primary" onclick="createRoom()" style="margin-bottom: 8px;">
+                👑 Tạo phòng mới (Quản trò)
+            </button>
+
+            <div style="text-align:center; color:#484f58; font-size:0.85em; padding: 6px 0;">— hoặc —</div>
+
+            <input type="text" id="roomInput" placeholder="Nhập mã phòng (VD: AB3K)" 
+                   style="text-align:center; font-size:1.3em; letter-spacing:4px; text-transform:uppercase;" 
+                   maxlength="4" autocomplete="off">
+            <button class="btn btn-secondary" onclick="joinRoom()">
+                🚪 Tham gia phòng
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════ LOBBY VIEW (Player waiting) ══════════ -->
+    <div id="lobby-view" class="hidden">
+        <div class="panel">
+            <h2>⏳ Phòng chờ</h2>
+            <div class="room-code" id="lobby-room-code">----</div>
+            <p style="text-align:center; margin: 8px 0;">
+                <span class="badge badge-waiting" id="lobby-status">Đang đợi Quản trò chia bài...</span>
+            </p>
+            <p style="text-align:center; font-size: 1.2em; margin-top: 12px;">
+                👥 Người chơi: <b id="lobby-player-count">0</b>
+            </p>
+        </div>
+    </div>
+
+    <!-- ══════════ MODERATOR VIEW ══════════ -->
+    <div id="mod-view" class="hidden">
+        <div class="panel">
+            <h3>📢 Mã phòng — Chia sẻ cho bạn bè</h3>
+            <div class="room-code" id="mod-room-code">----</div>
+            <div class="qr-wrap">
+                <img id="qr-img" alt="QR Code" style="width:180px; height:180px; border-radius:8px; display:none;">
+                <p id="qr-fallback" class="hidden" style="word-break:break-all; font-size:0.8em; color:#58a6ff;"></p>
+            </div>
+            <p style="text-align:center; color:#8b949e; font-size:0.8em;">Quét QR hoặc nhập mã để vào phòng</p>
+        </div>
+
+        <div class="panel">
+            <h3>👥 Người chơi (<span id="mod-player-count">0</span>)</h3>
+            <ul class="player-list" id="playerList"></ul>
+            <p id="no-players-msg" style="color:#484f58; font-size:0.85em; text-align:center; padding:12px;">
+                Chưa có người chơi nào...
+            </p>
+        </div>
+
+        <div class="panel" id="role-config-panel">
+            <h3>🃏 Chọn vai trò</h3>
+            <div id="role-selector"></div>
+            <div id="expansion-roles" class="hidden"></div>
+            <div class="toggle-expansion" id="toggle-exp-btn" onclick="toggleExpansion()">
+                ▼ Hiện thêm vai trò mở rộng
+            </div>
+
+            <div class="role-stats">
+                <span>Đã chọn: <span id="total-roles">0</span></span>
+                <span>Cần: <span id="total-players-req">0</span></span>
+                <span id="match-indicator"></span>
+            </div>
+
+            <button class="btn btn-purple" id="assignBtn" onclick="assignRoles()" disabled>
+                🎴 Xáo & Chia bài
+            </button>
+        </div>
+
+        <!-- Cheat Sheet (hidden until roles assigned) -->
+        <div class="panel hidden" id="cheat-sheet-panel">
+            <h3>📋 Bảng theo dõi (Chỉ Quản trò thấy)</h3>
+            <table class="cheat-table" id="cheat-table">
+                <thead><tr><th>Tên</th><th>Vai trò</th></tr></thead>
+                <tbody id="cheat-body"></tbody>
+            </table>
+            <div class="btn-row" style="margin-top: 12px;">
+                <button class="btn btn-danger" onclick="resetRoom()">🔄 Chia lại</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ GAME VIEW (Player sees role) ══════════ -->
+    <div id="game-view" class="hidden">
+        <div class="panel">
+            <h2 style="text-align:center;">Vai trò của bạn</h2>
+            <div class="card-scene">
+                <div class="card" id="role-card"
+                     ontouchstart="startReveal(event)" ontouchend="endReveal(event)" ontouchcancel="endReveal(event)"
+                     onmousedown="startReveal(event)" onmouseup="endReveal(event)" onmouseleave="endReveal(event)">
+                    <div class="card-face card-front">
+                        <div class="card-icon">❓</div>
+                        <div>Nhấn & giữ để xem</div>
+                        <div class="card-hint">Buông tay = ẩn bài</div>
+                    </div>
+                    <div class="card-face card-back">
+                        <div class="role-reveal-emoji" id="reveal-emoji">🐺</div>
+                        <div class="role-reveal-name" id="reveal-name">???</div>
+                        <div class="role-reveal-desc" id="reveal-desc"></div>
+                    </div>
+                </div>
+            </div>
+            <p class="reveal-instruction">👆 Nhấn giữ để lật bài — Buông tay để úp lại</p>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+// ROLES CONFIG — 27 vai trò Ma Sói
+// ═══════════════════════════════════════════════════════
+const rolesConfig = [
+    // ── PHE SÓI ──
+    { id: 'werewolf',    nameVi: 'Sói',          emoji: '🐺', faction: 'soi', tier: 'core',      maxCount: 4, desc: 'Mỗi đêm thức dậy chọn 1 người để giết.' },
+    { id: 'alpha_wolf',  nameVi: 'Sói Chúa',     emoji: '🐾', faction: 'soi', tier: 'expansion', maxCount: 1, desc: 'Một lần biến nạn nhân thành Sói thay vì giết.' },
+    { id: 'wolf_cub',    nameVi: 'Sói Con',       emoji: '🐶', faction: 'soi', tier: 'expansion', maxCount: 1, desc: 'Khi chết, Sói được cắn 2 người đêm kế tiếp.' },
+    { id: 'cursed_wolf', nameVi: 'Sói Nguyền',    emoji: '😈', faction: 'soi', tier: 'expansion', maxCount: 1, desc: 'Tiên tri soi ra Dân. Bị Sói cắn → thành Sói.' },
+
+    // ── PHE DÂN ──
+    { id: 'villager',     nameVi: 'Dân Làng',      emoji: '👤', faction: 'dan', tier: 'core',      maxCount: 13, desc: 'Không có năng lực đặc biệt.' },
+    { id: 'seer',         nameVi: 'Tiên Tri',      emoji: '🔮', faction: 'dan', tier: 'core',      maxCount: 1,  desc: 'Mỗi đêm soi 1 người, biết Sói hay Dân.' },
+    { id: 'witch',        nameVi: 'Phù Thủy',      emoji: '🧙‍♀️', faction: 'dan', tier: 'core',   maxCount: 1,  desc: 'Có 1 bình cứu + 1 bình giết, dùng 1 lần.' },
+    { id: 'bodyguard',    nameVi: 'Bảo Vệ',        emoji: '🛡️', faction: 'dan', tier: 'core',     maxCount: 1,  desc: 'Mỗi đêm bảo vệ 1 người, không lặp 2 đêm.' },
+    { id: 'hunter',       nameVi: 'Thợ Săn',       emoji: '🏹', faction: 'dan', tier: 'core',      maxCount: 1,  desc: 'Khi chết, bắn chết 1 người bất kỳ.' },
+    { id: 'cupid',        nameVi: 'Thần Tình Yêu', emoji: '💘', faction: 'dan', tier: 'core',      maxCount: 1,  desc: 'Đêm đầu ghép 2 người, 1 chết → cả 2 chết.' },
+    { id: 'little_girl',  nameVi: 'Cô Bé',         emoji: '👧', faction: 'dan', tier: 'core',      maxCount: 1,  desc: 'Hé mắt nhìn khi Sói thức, bị thấy → chết.' },
+    { id: 'mayor',        nameVi: 'Trưởng Làng',   emoji: '👑', faction: 'dan', tier: 'core',      maxCount: 1,  desc: 'Phiếu bầu x2, chết → chỉ định người kế.' },
+    { id: 'elder',        nameVi: 'Già Làng',       emoji: '👴', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: 'Chịu 2 đòn Sói. Bị Dân giết → mất hết năng lực.' },
+    { id: 'idiot',        nameVi: 'Thằng Ngốc',    emoji: '🤪', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: 'Bị treo cổ → sống, mất quyền vote.' },
+    { id: 'scapegoat',    nameVi: 'Kẻ Thế Thân',   emoji: '🐐', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: 'Vote hòa → chết thay, chọn ai vote ngày sau.' },
+    { id: 'raven',        nameVi: 'Con Quạ',        emoji: '🐦‍⬛', faction: 'dan', tier: 'expansion', maxCount: 1, desc: 'Mỗi đêm gửi thư → nạn nhân +2 phiếu.' },
+    { id: 'knight',       nameVi: 'Hiệp Sĩ',       emoji: '⚔️', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: 'Bị Sói giết → Sói bên trái chết theo.' },
+    { id: 'two_sisters',  nameVi: 'Hai Chị Em',     emoji: '👯', faction: 'dan', tier: 'expansion', maxCount: 2,  desc: '2 người biết mặt nhau, đêm trao đổi ngắn.' },
+    { id: 'three_brothers', nameVi: 'Ba Anh Em',    emoji: '👨‍👦‍👦', faction: 'dan', tier: 'expansion', maxCount: 3, desc: '3 người biết mặt nhau, đêm trao đổi ngắn.' },
+    { id: 'fox',          nameVi: 'Con Cáo',        emoji: '🦊', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: 'Chọn 1 người, biết nhóm 3 có Sói không.' },
+    { id: 'bear_tamer',   nameVi: 'Gấu',            emoji: '🐻', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: 'Ngồi cạnh Sói → quản trò báo "Gấu gầm".' },
+    { id: 'pyromaniac',   nameVi: 'Phóng Hỏa',     emoji: '🔥', faction: 'dan', tier: 'expansion', maxCount: 1,  desc: '1 lần đốt nhà, Sói cắn đó → Sói chết.' },
+
+    // ── TRUNG LẬP ──
+    { id: 'thief',       nameVi: 'Ăn Trộm',        emoji: '🤏', faction: 'trung_lap', tier: 'core',      maxCount: 1, desc: 'Đêm đầu xem 2 lá dư, chọn 1 thay vai.' },
+    { id: 'pied_piper',  nameVi: 'Thổi Sáo',       emoji: '🎵', faction: 'trung_lap', tier: 'expansion', maxCount: 1, desc: 'Mỗi đêm thôi miên 2 người. Thắng khi tất cả bị miên.' },
+    { id: 'white_wolf',  nameVi: 'Sói Trắng',      emoji: '🐺', faction: 'trung_lap', tier: 'expansion', maxCount: 1, desc: 'Cùng phe Sói nhưng cứ 2 đêm giết 1 Sói.' },
+    { id: 'angel',       nameVi: 'Thiên Sứ',       emoji: '😇', faction: 'trung_lap', tier: 'expansion', maxCount: 1, desc: 'Thắng nếu bị loại đêm/ngày đầu tiên.' },
+    { id: 'wild_child',  nameVi: 'Trẻ Hoang',      emoji: '🧒', faction: 'trung_lap', tier: 'expansion', maxCount: 1, desc: 'Chọn idol, idol chết → thành Sói.' },
+];
+
+// ═══════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════
+const socket = io(window.location.origin, {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000
+});
+let currentRoom = '';
+let isModerator = false;
+let selectedRoles = {};   // { roleId: count }
+let showExpansion = false;
+let revealTimer = null;
+const REVEAL_DELAY = 300; // ms — long-press protection
+
+// ═══════════════════════════════════════════════════════
+// DOM REFS
+// ═══════════════════════════════════════════════════════
+const views = {
+    login: document.getElementById('login-view'),
+    lobby: document.getElementById('lobby-view'),
+    mod:   document.getElementById('mod-view'),
+    game:  document.getElementById('game-view')
+};
+
+// ═══════════════════════════════════════════════════════
+// AUTO-FILL Room Code from URL  (?room=XXXX)
+// ═══════════════════════════════════════════════════════
+(function autoFillRoom() {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room');
+    if (room) {
+        document.getElementById('roomInput').value = room.toUpperCase();
+    }
+})();
+
+// ═══════════════════════════════════════════════════════
+// VIEW MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function showView(name) {
+    Object.values(views).forEach(v => v.classList.add('hidden'));
+    views[name].classList.remove('hidden');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════════════
+// LOGIN ACTIONS
+// ═══════════════════════════════════════════════════════
+function createRoom() {
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) return showToast('Nhập tên của bạn trước!');
+    socket.emit('create_room');
+    isModerator = true;
+}
+
+function joinRoom() {
+    const name = document.getElementById('nameInput').value.trim();
+    const room = document.getElementById('roomInput').value.trim().toUpperCase();
+    if (!name) return showToast('Nhập tên của bạn trước!');
+    if (!room || room.length < 4) return showToast('Nhập mã phòng 4 ký tự!');
+    currentRoom = room;
+    socket.emit('join_room', { roomId: room, name });
+}
+
+// ═══════════════════════════════════════════════════════
+// ROLE COUNTER UI
+// ═══════════════════════════════════════════════════════
+const factionMeta = {
+    'soi':       { label: '🐺 Phe Sói',     cssClass: 'faction-soi' },
+    'dan':       { label: '👥 Phe Dân Làng', cssClass: 'faction-dan' },
+    'trung_lap': { label: '⚖️ Trung Lập',   cssClass: 'faction-trung_lap' }
+};
+
+function renderRoleSelector() {
+    const coreContainer = document.getElementById('role-selector');
+    const expContainer  = document.getElementById('expansion-roles');
+    coreContainer.innerHTML = '';
+    expContainer.innerHTML = '';
+
+    const factions = ['soi', 'dan', 'trung_lap'];
+
+    factions.forEach(faction => {
+        const coreRoles = rolesConfig.filter(r => r.faction === faction && r.tier === 'core');
+        const expRoles  = rolesConfig.filter(r => r.faction === faction && r.tier === 'expansion');
+        const meta = factionMeta[faction];
+
+        if (coreRoles.length > 0) {
+            coreContainer.innerHTML += `<div class="faction-header ${meta.cssClass}">${meta.label}</div>`;
+            coreRoles.forEach(role => { coreContainer.innerHTML += roleRowHTML(role); });
+        }
+
+        if (expRoles.length > 0) {
+            expContainer.innerHTML += `<div class="faction-header ${meta.cssClass}">${meta.label} (Mở rộng)</div>`;
+            expRoles.forEach(role => { expContainer.innerHTML += roleRowHTML(role); });
+        }
+    });
+}
+
+function roleRowHTML(role) {
+    const count = selectedRoles[role.id] || 0;
+    return `
+        <div class="role-row" title="${role.desc}">
+            <div class="role-info">
+                <span class="role-emoji">${role.emoji}</span>
+                <span class="role-name">${role.nameVi}</span>
+            </div>
+            <div class="role-counter">
+                <button onclick="updateRole('${role.id}', -1)">−</button>
+                <span class="count ${count > 0 ? 'count-active' : 'count-zero'}" id="cnt-${role.id}">${count}</span>
+                <button onclick="updateRole('${role.id}', 1)">+</button>
+            </div>
+        </div>`;
+}
+
+function updateRole(id, delta) {
+    const role = rolesConfig.find(r => r.id === id);
+    if (!role) return;
+    const current = selectedRoles[id] || 0;
+    const next = Math.max(0, Math.min(role.maxCount, current + delta));
+    selectedRoles[id] = next;
+
+    const el = document.getElementById(`cnt-${id}`);
+    if (el) {
+        el.textContent = next;
+        el.className = 'count ' + (next > 0 ? 'count-active' : 'count-zero');
+    }
+    updateRoleStats();
+}
+
+function toggleExpansion() {
+    showExpansion = !showExpansion;
+    document.getElementById('expansion-roles').classList.toggle('hidden', !showExpansion);
+    document.getElementById('toggle-exp-btn').textContent =
+        showExpansion ? '▲ Ẩn vai trò mở rộng' : '▼ Hiện thêm vai trò mở rộng';
+}
+
+function getTotalRoles() {
+    return Object.values(selectedRoles).reduce((a, b) => a + b, 0);
+}
+
+function updateRoleStats() {
+    const total = getTotalRoles();
+    const req = parseInt(document.getElementById('total-players-req').textContent) || 0;
+    document.getElementById('total-roles').textContent = total;
+
+    const indicator = document.getElementById('match-indicator');
+    const btn = document.getElementById('assignBtn');
+    if (total === req && total > 0) {
+        indicator.innerHTML = '<span class="match">✓ Khớp!</span>';
+        btn.disabled = false;
+    } else {
+        indicator.innerHTML = `<span class="mismatch">${total > req ? '↑ Thừa' : '↓ Thiếu'}</span>`;
+        btn.disabled = true;
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// ASSIGN ROLES
+// ═══════════════════════════════════════════════════════
+function assignRoles() {
+    // Build flat array from selectedRoles
+    const roleArray = [];
+    for (const [id, count] of Object.entries(selectedRoles)) {
+        const role = rolesConfig.find(r => r.id === id);
+        if (role && count > 0) {
+            for (let i = 0; i < count; i++) {
+                roleArray.push(role.nameVi);
+            }
+        }
+    }
+    socket.emit('start_assign_roles', { roomId: currentRoom, selectedRoles: roleArray });
+}
+
+// ═══════════════════════════════════════════════════════
+// RESET / RE-DEAL
+// ═══════════════════════════════════════════════════════
+function resetRoom() {
+    if (!confirm('Chia lại bài? Tất cả người chơi sẽ quay về phòng chờ.')) return;
+    socket.emit('reset_room', { roomId: currentRoom });
+    document.getElementById('cheat-sheet-panel').classList.add('hidden');
+    document.getElementById('role-config-panel').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════
+// QR CODE
+// ═══════════════════════════════════════════════════════
+function renderQR(code) {
+    const url = `${window.location.origin}?room=${code}`;
+    const img = document.getElementById('qr-img');
+    const fallback = document.getElementById('qr-fallback');
+
+    if (typeof QRCode !== 'undefined') {
+        QRCode.toDataURL(url, {
+            width: 180,
+            margin: 1,
+            color: { dark: '#000000', light: '#ffffff' }
+        }, function(err, dataUrl) {
+            if (err) {
+                console.error('QR error:', err);
+                fallback.textContent = url;
+                fallback.classList.remove('hidden');
+                return;
+            }
+            img.src = dataUrl;
+            img.style.display = 'block';
+            img.style.margin = '0 auto';
+        });
+    } else {
+        // CDN failed — show link as fallback
+        fallback.innerHTML = `<a href="${url}" style="color:#58a6ff;">${url}</a>`;
+        fallback.classList.remove('hidden');
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// TAP-TO-REVEAL (Long-press 300ms + 3D Flip)
+// ═══════════════════════════════════════════════════════
+function startReveal(e) {
+    e.preventDefault();
+    revealTimer = setTimeout(() => {
+        document.getElementById('role-card').classList.add('is-flipped');
+        if ('vibrate' in navigator) navigator.vibrate(100);
+    }, REVEAL_DELAY);
+}
+
+function endReveal(e) {
+    e.preventDefault();
+    clearTimeout(revealTimer);
+    document.getElementById('role-card').classList.remove('is-flipped');
+}
+
+// ═══════════════════════════════════════════════════════
+// MODERATOR CHEAT SHEET
+// ═══════════════════════════════════════════════════════
+function renderCheatSheet(summary) {
+    const body = document.getElementById('cheat-body');
+    body.innerHTML = '';
+
+    // Resolve faction for each role name
+    const enriched = summary.map(s => {
+        const cfg = rolesConfig.find(r => r.nameVi === s.role);
+        return { ...s, faction: cfg ? cfg.faction : 'dan', emoji: cfg ? cfg.emoji : '❓' };
+    });
+
+    // Group by faction
+    const groups = { 'soi': [], 'dan': [], 'trung_lap': [] };
+    enriched.forEach(e => {
+        (groups[e.faction] || groups['dan']).push(e);
+    });
+
+    const fLabels = { 'soi': '🐺 Phe Sói', 'dan': '👥 Phe Dân', 'trung_lap': '⚖️ Trung Lập' };
+    ['soi', 'trung_lap', 'dan'].forEach(f => {
+        if (groups[f].length === 0) return;
+        body.innerHTML += `<tr class="cheat-faction-row"><td colspan="2">${fLabels[f]}</td></tr>`;
+        groups[f].forEach(p => {
+            body.innerHTML += `<tr><td>${p.name}</td><td>${p.emoji} ${p.role}</td></tr>`;
+        });
+    });
+
+    document.getElementById('cheat-sheet-panel').classList.remove('hidden');
+    document.getElementById('role-config-panel').classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════════════════
+// KICK PLAYER
+// ═══════════════════════════════════════════════════════
+function kick(playerId) {
+    if (!confirm('Kick người chơi này?')) return;
+    socket.emit('kick_player', { roomId: currentRoom, playerId });
+}
+
+// ═══════════════════════════════════════════════════════
+// SOCKET EVENTS
+// ═══════════════════════════════════════════════════════
+socket.on('room_created', ({ roomCode }) => {
+    currentRoom = roomCode;
+    document.getElementById('mod-room-code').textContent = roomCode;
+    renderQR(roomCode);
+    renderRoleSelector();
+    showView('mod');
+});
+
+socket.on('role_assigned', ({ type, roomCode }) => {
+    if (type === 'moderator') {
+        showView('mod');
+    } else {
+        if (roomCode) currentRoom = roomCode;
+        document.getElementById('lobby-room-code').textContent = currentRoom;
+        showView('lobby');
+    }
+});
+
+socket.on('error_msg', (msg) => {
+    showToast('⚠️ ' + msg);
+});
+
+socket.on('player_count_update', (count) => {
+    document.getElementById('lobby-player-count').textContent = count;
+    document.getElementById('mod-player-count').textContent = count;
+    document.getElementById('total-players-req').textContent = count;
+    updateRoleStats();
+});
+
+socket.on('player_list_update', (players) => {
+    const list = document.getElementById('playerList');
+    const noMsg = document.getElementById('no-players-msg');
+    list.innerHTML = '';
+
+    if (players.length === 0) {
+        noMsg.classList.remove('hidden');
+    } else {
+        noMsg.classList.add('hidden');
+        players.forEach((p, i) => {
+            const li = document.createElement('li');
+            li.className = 'player-item';
+            li.innerHTML = `
+                <span>${i + 1}. <b>${p.name}</b></span>
+                <button class="btn btn-danger btn-sm" onclick="kick('${p.id}')">Kick</button>`;
+            list.appendChild(li);
+        });
+    }
+});
+
+socket.on('receive_role', (roleName) => {
+    // Find role config
+    const cfg = rolesConfig.find(r => r.nameVi === roleName);
+    document.getElementById('reveal-emoji').textContent = cfg ? cfg.emoji : '❓';
+    document.getElementById('reveal-name').textContent = roleName;
+    document.getElementById('reveal-desc').textContent = cfg ? cfg.desc : '';
+
+    showView('game');
+    showToast('🎴 Bài đã được chia!');
+    if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+});
+
+socket.on('role_summary', (summary) => {
+    renderCheatSheet(summary);
+});
+
+socket.on('status_msg', (msg) => {
+    showToast('✅ ' + msg);
+});
+
+socket.on('room_reset', () => {
+    if (!isModerator) {
+        document.getElementById('role-card').classList.remove('is-flipped');
+        showView('lobby');
+        showToast('🔄 Quản trò đang chia lại bài...');
+    }
+});
+
+socket.on('kicked', () => {
+    showToast('🚫 Bạn đã bị kick khỏi phòng.');
+    setTimeout(() => { showView('login'); }, 1500);
+});
+
+socket.on('mod_status_update', ({ hasModerator }) => {
+    if (!hasModerator && !isModerator) {
+        showToast('Quản trò đã rời phòng!');
+    }
+});
+
+// ═══════════════════════════════════════════════════════
+// PWA — Service Worker Registration
+// ═══════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+renderRoleSelector();
+</script>
+</body>
+</html>
