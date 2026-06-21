@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getSocket, isMock, C2S, S2C } from '../lib/socket.js';
+import { getSocket, isMock, S2C } from '../lib/socket.js';
 import AvatarCircle from '../components/AvatarCircle.jsx';
 import DevPanel from '../components/DevPanel.jsx';
 import { PLAYER_STATUS } from '../lib/contracts.js';
@@ -102,8 +102,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
   }
 
   function start() {
-    socket.emit(C2S.GAME_START, { code, roles: roleCounts });
-    onStart?.();
+    onStart?.({ code, roles: roleCounts, players: seats });
   }
 
   return (

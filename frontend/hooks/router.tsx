@@ -11,6 +11,7 @@ import {
 import LoginScreen from "../src/screens/LoginScreen.jsx";
 import LobbyScreen from "../src/screens/LobbyScreen.jsx";
 import WaitingRoom from "../src/screens/WaitingRoom.jsx";
+import RoleRevealScreen from "../src/screens/RoleRevealScreen.jsx";
 import GameBoardDay from "../src/screens/GameBoardDay.jsx";
 import NightScreen from "../src/screens/NightScreen.jsx";
 import ProfileVault from "../src/screens/ProfileVault.jsx";
@@ -86,7 +87,11 @@ function WaitingRoomRoute() {
 
   return (
     <WaitingRoom
-      onStart={() => navigate(`/game/${roomId}`)}
+      onStart={(payload) =>
+        navigate(`/room/${roomId}/reveal`, {
+          state: payload,
+        })
+      }
       onLeave={() => navigate("/lobby")}
     />
   );
@@ -118,6 +123,10 @@ function RouterRoutes() {
         <Route
           path="/room/:roomId/wait"
           element={loggedIn ? <WaitingRoomRoute /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/room/:roomId/reveal"
+          element={loggedIn ? <RoleRevealScreen /> : <Navigate to="/" replace />}
         />
         <Route
           path="/game/:roomId"
