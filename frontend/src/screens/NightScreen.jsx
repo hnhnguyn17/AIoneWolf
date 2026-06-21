@@ -14,7 +14,7 @@ import { useEffect, useMemo } from 'react';
 import AvatarCircle from '../components/AvatarCircle.jsx';
 import ChronicleLog from '../components/ChronicleLog.jsx';
 import PhaseIndicator from '../components/PhaseIndicator.jsx';
-import MicIndicator from '../components/MicIndicator.jsx';
+import GMNarrator from '../components/GMNarrator.jsx';
 import GMSpeechBubble from '../components/GMSpeechBubble.jsx';
 import Countdown from '../components/Countdown.jsx';
 import { ROLE, ROLE_LABEL, PLAYER_STATUS } from '../lib/contracts.js';
@@ -53,70 +53,66 @@ export default function NightScreen({ session, onExit }) {
   void alive;
 
   return (
-    <div className="min-h-screen w-full flex flex-col xl:flex-row antialiased relative">
+    <div className="h-screen w-full flex flex-col xl:flex-row antialiased relative overflow-hidden">
       {/* Nền rừng cố định + phủ TỐI ĐẬM ám xanh (ban đêm) */}
       <div className="forest-bg" />
       <div className="forest-overlay-night" />
       <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_50%_40%,rgba(0,219,231,0.06)_0%,transparent_70%)] pointer-events-none" />
       <div className="scanlines opacity-40" />
 
-      {/* Exit */}
-      <div className="fixed top-gutter right-gutter z-50">
-        <button
-          onClick={onExit}
-          className="flex items-center gap-2 px-4 py-2 rounded border border-primary/50 text-primary font-button text-button uppercase tracking-wider hover:bg-primary/10 transition-all glow-active"
-        >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
-          <span className="hidden sm:inline">Abort Link</span>
-        </button>
-      </div>
-
       {/* LEFT: The Void */}
-      <section className="w-full xl:w-7/12 relative z-10 flex flex-col border-b xl:border-b-0 xl:border-r border-outline-variant/30">
-        <div className="absolute top-8 left-8 z-20">
+      <section className="w-full xl:w-7/12 h-full relative z-10 flex flex-col border-b xl:border-b-0 xl:border-r border-outline-variant/30 overflow-hidden">
+        {/* HUD trên-trái: pha + ĐỒNG HỒ + vai + nút Thoát */}
+        <div className="absolute top-6 left-6 z-20 flex flex-col gap-2">
           <PhaseIndicator phase={phase} cycle={cycle} />
-          {role && (
-            <p className="mt-2 font-label-sm text-label-sm text-surface-tint uppercase tracking-widest">
-              Your role: {ROLE_LABEL[role] || role}
-              {isWolf ? ' · Comms open (WOLF)' : ''}
-            </p>
-          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            {deadline && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-surface-tint/40 bg-surface-tint/10">
+                <Countdown deadline={deadline} />
+              </span>
+            )}
+            {role && (
+              <span className="font-label-sm text-label-sm text-surface-tint uppercase tracking-widest">
+                Vai: {ROLE_LABEL[role] || role}{isWolf ? ' · WOLF' : ''}
+              </span>
+            )}
+            <button
+              onClick={onExit}
+              className="flex items-center gap-1 px-3 py-1 rounded border border-error/50 text-error font-button text-button uppercase tracking-wider hover:bg-error/10 transition-all"
+            >
+              <span className="material-symbols-outlined text-[16px]">logout</span>
+              <span className="hidden sm:inline">Thoát</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-8 pt-28">
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4">
           <AvatarCircle
             players={players}
+            sizeClass="w-[min(52vh,440px)]"
             speakingId={speakingId}
             anonymous={anonymousFor}
             center={
               gmSpeech ? (
                 <GMSpeechBubble text={gmSpeech.text} tone={gmSpeech.tone || 'night'} />
               ) : (
-                <MicIndicator active={false} label="Sensory Inputs Restricted" />
+                <GMNarrator label="AI Quản trò" />
               )
             }
           />
         </div>
 
         {/* Bottom restricted bar */}
-        <div className="p-gutter glass-panel border-x-0 border-b-0 border-t border-outline-variant/30 flex items-center justify-between">
-          <span className="font-label-sm text-label-sm text-outline-variant uppercase tracking-widest flex items-center gap-2">
+        <div className="shrink-0 p-4 glass-panel border-x-0 border-b-0 border-t border-outline-variant/30 flex items-center justify-center">
+          <span className="font-label-sm text-label-sm text-outline-variant uppercase tracking-widest flex items-center gap-2 text-center">
             <span className="material-symbols-outlined text-[16px]">lock</span>
-            Night phase — actions resolved by the Abyss
+            Đêm — mỗi vai âm thầm quyết định trong Vực Thẳm
           </span>
-          {deadline ? (
-            <Countdown deadline={deadline} />
-          ) : (
-            <span className="text-surface-tint animate-pulse flex items-center gap-1 font-label-sm text-label-sm">
-              <span className="material-symbols-outlined text-[14px]">hourglass_empty</span>
-              --:--
-            </span>
-          )}
         </div>
       </section>
 
       {/* RIGHT: Chronicle (locked unless wolf) */}
-      <section className="w-full xl:w-5/12 h-[60vh] xl:h-screen p-4 xl:p-gutter z-10 flex flex-col">
+      <section className="w-full xl:w-5/12 h-full p-3 xl:p-gutter z-10 flex flex-col overflow-hidden">
         <ChronicleLog
           title="Chronicle"
           subtitle="Night Cycle Active"

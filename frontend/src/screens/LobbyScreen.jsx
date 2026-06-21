@@ -120,9 +120,19 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
 
         {/* HERO — tên game lớn + tagline */}
         <div className="flex-1 flex flex-col items-center justify-center text-center my-stack-lg">
-          <h1 className="font-display-lg text-[15vw] md:text-[110px] leading-[0.9] text-surface-tint tracking-tighter uppercase drop-shadow-[0_0_30px_rgba(0,219,231,0.45)]">
+          <h1
+            className={`font-display-lg text-[15vw] md:text-[110px] leading-[0.9] tracking-tighter uppercase ${
+              isDay
+                ? 'text-[#06414b] drop-shadow-[0_2px_10px_rgba(255,255,255,0.45)]'
+                : 'text-surface-tint drop-shadow-[0_0_30px_rgba(0,219,231,0.45)]'
+            }`}
+          >
             Echoes
-            <span className="block text-on-surface text-[8vw] md:text-[56px] tracking-[0.2em] mt-1">
+            <span
+              className={`block text-[8vw] md:text-[56px] tracking-[0.2em] mt-1 ${
+                isDay ? 'text-[#08323a]' : 'text-on-surface'
+              }`}
+            >
               of the Lycan
             </span>
           </h1>

@@ -9,10 +9,11 @@
  *   - Nút "Thêm" → onAdd(keys[]) (cha +1 mỗi vai).
  *
  * Props:
- *   open       : boolean
- *   allRoles   : [{ key, name, team, icon, wip, desc }]
- *   teamColor  : TEAM_COLOR map (team -> "text-... border-...")
- *   teamLabel  : TEAM_LABEL map (team -> tên VN) — optional
+ *   open         : boolean
+ *   allRoles     : [{ key, name, team, icon, wip, desc }]
+ *   existingKeys : string[] — các vai ĐÃ có trong phòng (sẽ bị ẩn khỏi list)
+ *   teamColor    : TEAM_COLOR map (team -> "text-... border-...")
+ *   teamLabel    : TEAM_LABEL map (team -> tên VN) — optional
  *   onAdd(keys)
  *   onClose()
  */
@@ -30,6 +31,7 @@ function norm(s) {
 export default function RoleAddPicker({
   open,
   allRoles = [],
+  existingKeys = [],
   teamColor = {},
   teamLabel = {},
   onAdd,
@@ -38,11 +40,17 @@ export default function RoleAddPicker({
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState(() => new Set());
 
+  // Chỉ hiện vai CHƯA có trong phòng (ẩn các vai đã được thêm).
+  const available = useMemo(() => {
+    const have = new Set(existingKeys);
+    return allRoles.filter((r) => !have.has(r.key));
+  }, [allRoles, existingKeys]);
+
   const filtered = useMemo(() => {
     const q = norm(query.trim());
-    if (!q) return allRoles;
-    return allRoles.filter((r) => norm(r.name).includes(q) || norm(r.key).includes(q));
-  }, [allRoles, query]);
+    if (!q) return available;
+    return available.filter((r) => norm(r.name).includes(q) || norm(r.key).includes(q));
+  }, [available, query]);
 
   if (!open) return null;
 
@@ -153,7 +161,7 @@ export default function RoleAddPicker({
                       </span>
                       {r.wip && (
                         <span className="font-label-sm text-[10px] px-1.5 py-0.5 rounded bg-on-tertiary-container/30 text-on-tertiary-container uppercase">
-                          beta
+                          advances
                         </span>
                       )}
                     </div>

@@ -15,7 +15,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSocket } from '../lib/socket.js';
 
-export default function DevPanel({ context = 'game' }) {
+/**
+ * @param {string}   context   'waiting' | 'game' — đổi nút hiển thị theo màn.
+ * @param {number}   fillCount số ghế cần điền bot (= tổng vai đã chọn). Mặc định 8.
+ * @param {()=>void} onRunTest callback "chạy thử quy trình": fill bot xong → bắt
+ *                             đầu ván & vào màn game (WaitingRoom truyền start()).
+ */
+export default function DevPanel({ context = 'game', fillCount = 8, onRunTest }) {
   // GUARD CỨNG: production tuyệt đối không render.
   if (!import.meta.env.DEV) return null;
 
@@ -23,6 +29,7 @@ export default function DevPanel({ context = 'game' }) {
   // Mặc định THU GỌN (chỉ nút DEV nhỏ) cho gọn màn hình — bấm mới bung panel.
   const [open, setOpen] = useState(false);
   const [auto, setAuto] = useState(false);
+  const [confirmRun, setConfirmRun] = useState(false); // nút xanh xác nhận chạy thử
   const autoRef = useRef(null);
 
   // Auto-skip: cứ 3.5s pass 1 pha để tua nhanh cả ván test.
@@ -33,8 +40,15 @@ export default function DevPanel({ context = 'game' }) {
     return () => clearInterval(autoRef.current);
   }, [auto, socket]);
 
-  const fillBots = () => socket.emit('dev:fill_bots', { count: 8 });
+  const fillBots = () => socket.emit('dev:fill_bots', { count: fillCount });
   const skip = () => socket.emit('dev:skip_phase');
+
+  // Chạy thử quy trình: điền đủ bot rồi bắt đầu ván (vào màn game tự diễn).
+  function runTest() {
+    socket.emit('dev:fill_bots', { count: fillCount });
+    setTimeout(() => onRunTest?.(), 250); // chờ room:state cập nhật bot rồi start
+    setConfirmRun(false);
+  }
 
   if (!open) {
     return (
@@ -64,13 +78,47 @@ export default function DevPanel({ context = 'game' }) {
       </p>
 
       {context === 'waiting' && (
-        <button
-          onClick={fillBots}
-          className="w-full mb-2 bg-surface-tint/15 border border-surface-tint/50 text-surface-tint py-1.5 rounded uppercase tracking-widest hover:bg-surface-tint/25 transition-colors flex items-center justify-center gap-1"
-        >
-          <span className="material-symbols-outlined text-[14px]">smart_toy</span>
-          Fill bots (đủ người)
-        </button>
+        <>
+          <button
+            onClick={fillBots}
+            className="w-full mb-2 bg-surface-tint/15 border border-surface-tint/50 text-surface-tint py-1.5 rounded uppercase tracking-widest hover:bg-surface-tint/25 transition-colors flex items-center justify-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+            Fill bots ({fillCount})
+          </button>
+
+          {/* Nút xanh lá: xác nhận "chạy thử quy trình" — fill + start + tự diễn */}
+          {confirmRun ? (
+            <div className="mb-2 p-2 rounded border border-green-400/60 bg-green-400/10 flex flex-col gap-2">
+              <span className="text-green-300 leading-snug">
+                Chạy thử quy trình ván demo (4 ngày 3 đêm)?
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={runTest}
+                  className="flex-1 bg-green-400/20 border border-green-400/70 text-green-300 py-1.5 rounded uppercase tracking-widest hover:bg-green-400/30 transition-colors flex items-center justify-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">play_arrow</span>
+                  Có
+                </button>
+                <button
+                  onClick={() => setConfirmRun(false)}
+                  className="flex-1 border border-outline-variant/50 text-on-surface-variant py-1.5 rounded uppercase tracking-widest hover:text-error transition-colors"
+                >
+                  Huỷ
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmRun(true)}
+              className="w-full mb-2 bg-green-400/15 border border-green-400/60 text-green-300 py-1.5 rounded uppercase tracking-widest hover:bg-green-400/25 transition-colors flex items-center justify-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
+              Chạy thử quy trình
+            </button>
+          )}
+        </>
       )}
 
       <div className="flex gap-2">

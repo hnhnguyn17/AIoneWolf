@@ -131,9 +131,9 @@ export default function WorldChannel({ open, onClose, onJoin }) {
                     </span>
                   </div>
 
-                  {/* Tooltip chi tiết role khi hover */}
+                  {/* Tooltip chi tiết role khi hover — nền ĐẶC + z cao để không bị row khác che/mờ */}
                   {hover === r.code && r.roles && (
-                    <div className="absolute left-20 top-full mt-1 z-20 w-64 glass-panel rounded-lg p-3 border border-surface-tint/30 shadow-[0_0_20px_rgba(0,219,231,0.25)]">
+                    <div className="absolute left-20 top-full mt-1 z-[70] w-64 rounded-lg p-3 border border-surface-tint/50 bg-[#0c0810] shadow-[0_8px_30px_rgba(0,0,0,0.85),0_0_22px_rgba(0,219,231,0.4)]">
                       <p className="font-label-sm text-[10px] text-surface-tint uppercase tracking-widest mb-2">Cấu hình vai</p>
                       <div className="flex flex-col gap-1">
                         {Object.entries(r.roles).map(([key, n]) => (

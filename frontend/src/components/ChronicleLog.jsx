@@ -125,6 +125,10 @@ function Row({ msg }) {
   );
 }
 
+// Scope được coi là "chat theo vai" (ban đêm, kênh riêng của role).
+const ROLE_SCOPES = new Set(['WOLF', 'SEER', 'WITCH', 'GUARD', 'ROLE']);
+const isRoleMsg = (m) => m.kind === 'chat' && ROLE_SCOPES.has(m.scope);
+
 export default function ChronicleLog({
   title = 'Chronicle',
   subtitle,
@@ -135,12 +139,20 @@ export default function ChronicleLog({
   onSend,
 }) {
   const [draft, setDraft] = useState('');
+  // mode 'all' = Tổng (chat ngày + system/gm/alert);
+  // mode 'role' = Theo vai (chat ban đêm theo role: WOLF/SEER/...).
+  const [mode, setMode] = useState('all');
   const scrollRef = useRef(null);
+
+  const roleCount = messages.filter(isRoleMsg).length;
+  const shown = messages.filter((m) =>
+    mode === 'role' ? isRoleMsg(m) : !isRoleMsg(m),
+  );
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, mode]);
 
   function submit(e) {
     e.preventDefault();
@@ -174,15 +186,50 @@ export default function ChronicleLog({
         )}
       </header>
 
+      {/* Tabs: Tổng / Theo vai */}
+      <div className="flex items-center gap-1 px-4 pt-3 border-b border-outline-variant/20">
+        <button
+          type="button"
+          onClick={() => setMode('all')}
+          className={`flex items-center gap-1.5 px-3 py-2 font-label-sm text-[11px] uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+            mode === 'all'
+              ? 'border-surface-tint text-surface-tint'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px]">forum</span>
+          Tổng
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('role')}
+          className={`flex items-center gap-1.5 px-3 py-2 font-label-sm text-[11px] uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+            mode === 'role'
+              ? 'border-surface-tint text-surface-tint'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px]">groups</span>
+          Theo vai
+          {roleCount > 0 && (
+            <span className="ml-1 px-1.5 rounded-full bg-surface-tint/20 text-surface-tint tabular-nums">
+              {roleCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Log */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4 relative">
         <div className="absolute left-9 top-0 bottom-0 w-px bg-outline-variant/10 z-0" />
-        {messages.length === 0 && (
+        {shown.length === 0 && (
           <p className="font-label-sm text-label-sm text-outline-variant text-center mt-8">
-            Awaiting transmissions…
+            {mode === 'role'
+              ? 'Chưa có hội thoại theo vai. Kênh này mở khi vai của bạn hoạt động ban đêm.'
+              : 'Awaiting transmissions…'}
           </p>
         )}
-        {messages.map((m) => (
+        {shown.map((m) => (
           <Row key={m.id} msg={m} />
         ))}
       </div>
