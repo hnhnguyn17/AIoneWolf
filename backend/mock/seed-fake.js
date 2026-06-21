@@ -1,34 +1,52 @@
 /**
  * backend/mock/seed-fake.js
  * ─────────────────────────────────────────────────────────────
- * Bơm DỮ LIỆU GIẢ vào SQLite để thao tác thử: vài user (leaderboard),
- * vài phòng "kênh thế giới", và ít lịch sử ván. Chạy: `node mock/seed-fake.js`
+ * Bơm DỮ LIỆU GIẢ vào SQLite để thao tác thử: ~20 user (leaderboard),
+ * vài phòng "kênh thế giới", và ít lịch sử ván.
+ *
+ * Idempotent: chạy lại nhiều lần không nhân bản (dùng upsert + set thẳng stats).
+ * Chạy: `node mock/seed-fake.js`  (hoặc `npm run db:seed`)
  */
 const db = require('../src/db/store');
 
-// ── Fake users (cho leaderboard + profile) ──
-const USERS = [
-  { wallet: 'WolfKing7xQ2aLpZ9mNvBcD3fGhJ4kRtY8uVwXyZ1234', name: 'Sói Đầu Đàn', elo: 2150 },
-  { wallet: 'HunterAB12cd34EF56gh78IJ90kl12MN34op56QR78st90', name: 'Thợ Săn Bóng Đêm', elo: 1720 },
-  { wallet: 'SeerXY98zw76VU54ts32RQ10po98NM76lk54JI32hg10fe', name: 'Tiên Tri Cổ', elo: 1480 },
-  { wallet: 'GuardP1k2j3h4g5f6d7s8a9z0x1c2v3b4n5m6Q7W8E9R0T', name: 'Vệ Binh Thép', elo: 1180 },
-  { wallet: 'NewbieZ9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4j3h2g1f0', name: 'Tân Binh Mơ Mộng', elo: 620 },
-  { wallet: 'WitchM3a9s8k1p2o3i4u5y6t7r8e9w0q1z2x3c4v5b6n7m8', name: 'Phù Thủy Tím', elo: 1990 },
+// ── 20 fake users (cho leaderboard + profile) ──
+// Wallet chỉ là chuỗi định danh (không xác thực ở seed) — đủ dài cho giống địa chỉ Solana.
+const NAMES = [
+  'Sói Đầu Đàn', 'Thợ Săn Bóng Đêm', 'Tiên Tri Cổ', 'Vệ Binh Thép', 'Tân Binh Mơ Mộng',
+  'Phù Thủy Tím', 'Lữ Khách Vô Danh', 'Quạ Đêm', 'Bóng Ma Rừng Sâu', 'Trăng Máu',
+  'Kẻ Săn Tiền', 'Đao Phủ Lặng', 'Cú Mèo Trắng', 'Lang Thang', 'Hồn Sương',
+  'Thần Tình Yêu', 'Sát Thủ Im Lặng', 'Người Thổi Sáo', 'Linh Mục Già', 'Vua Sương Mù',
 ];
+
+// ELO rải đều các hạng: Chúa Tể (>=2000), Ma Sói (>=1500), Thợ Săn (>=1000), Tân Binh (<1000).
+const ELOS = [
+  2310, 2150, 1990, 1880, 1760, 1690, 1620, 1540, 1480, 1410,
+  1330, 1270, 1190, 1120, 1060, 980, 910, 840, 720, 610,
+];
+
+/** Tạo wallet giả tất định (deterministic) để seed lại không sinh ví mới. */
+function fakeWallet(i) {
+  const base = `Fake${String(i).padStart(2, '0')}Wolf`;
+  return (base + 'x'.repeat(44 - base.length)).slice(0, 44);
+}
+
+const USERS = NAMES.map((name, i) => ({ wallet: fakeWallet(i), name, elo: ELOS[i] }));
 
 for (const u of USERS) {
   db.upsertUser(u.wallet, { name: u.name });
-  // Set thẳng ELO fake cho đúng giá trị + win/loss hợp lý.
   const wins = Math.max(0, Math.round((u.elo - 1000) / 25)) + 5;
   const losses = Math.round(wins * 0.6);
   db.setStats(u.wallet, { elo: u.elo, wins, losses, bestStreak: Math.min(wins, 12) });
-  // Vài dòng lịch sử ván cho mục History (xen kẽ thắng/thua).
-  for (let i = 0; i < 6; i++) {
-    db.recordResult(u.wallet, {
-      role: ['WEREWOLF', 'SEER', 'VILLAGER', 'GUARD'][i % 4],
-      team: i % 3 === 0 ? 'WEREWOLF' : 'VILLAGE',
-      won: i % 2 === 0, survived: i % 2 === 0,
-    });
+
+  // Vài dòng lịch sử ván cho mục History (xen kẽ thắng/thua) — chỉ thêm nếu user chưa có lịch sử.
+  if (db.matchHistory(u.wallet, 1).length === 0) {
+    for (let i = 0; i < 6; i++) {
+      db.recordResult(u.wallet, {
+        role: ['WEREWOLF', 'SEER', 'VILLAGER', 'GUARD'][i % 4],
+        team: i % 3 === 0 ? 'WEREWOLF' : 'VILLAGE',
+        won: i % 2 === 0, survived: i % 2 === 0,
+      });
+    }
   }
   // Khôi phục ELO fake sau khi recordResult làm xê dịch.
   db.setStats(u.wallet, { elo: u.elo, wins, losses, bestStreak: Math.min(wins, 12) });
@@ -53,6 +71,7 @@ for (const r of ROOMS) {
 }
 
 console.log('✅ Seed xong:');
-console.log('   - Users:', db.leaderboard(10).map((u) => `${u.name}(${u.elo}/${u.rank.name})`).join(', '));
+console.log(`   - Users: ${db.leaderboard(1000).length} (hiển thị top 5: ` +
+  db.leaderboard(5).map((u) => `${u.name}(${u.elo}/${u.rank.name})`).join(', ') + ')');
 console.log('   - Rooms:', db.publicRooms(10).map((r) => `${r.code}[${r.status},${r.playerCount}/${r.maxPlayers}]`).join(', '));
 process.exit(0);

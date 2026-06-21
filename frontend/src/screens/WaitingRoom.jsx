@@ -158,7 +158,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
           </div>
         </aside>
 
-        <section className="flex-1 relative flex items-center justify-center min-h-[600px]">
+        <section className="flex-1 relative flex items-center justify-center min-h-[600px] pt-8 md:pt-12 xl:pl-24">
           <AvatarCircle
             players={seats}
             seats={totalRoles}

@@ -7,6 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed": "node mock/seed-fake.js",
     "sim": "node mock/sim-game.js"
   },
   "engines": {

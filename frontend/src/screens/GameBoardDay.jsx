@@ -92,10 +92,10 @@ export default function GameBoardDay({ session, onExit }) {
         </button>
       </div>
 
-      {/* LEFT: Arena */}
-      <section className="w-full xl:w-7/12 relative z-10 flex flex-col bg-abyss border-b xl:border-b-0 xl:border-r border-outline-variant/30">
+      {/* LEFT: Arena — ban ngày để trong suốt cho nền sáng lọt qua, các pha khác dùng nền abyss tối */}
+      <section className="w-full xl:w-7/12 relative z-10 flex flex-col border-b xl:border-b-0 xl:border-r border-outline-variant/30">
         <div className="absolute top-8 left-8 z-20">
-          <PhaseIndicator phase={phase} cycle={cycle} />
+          <PhaseIndicator phase={phase} cycle={cycle} alive={alive.length} total={players.length} />
           <div className="mt-2 flex items-center gap-3">
             {role && (
               <p className="font-label-sm text-label-sm text-surface-tint uppercase tracking-widest">

@@ -14,9 +14,12 @@ import { getSocket, isMock, C2S, S2C } from '../lib/socket.js';
 import { useAuth } from '../lib/auth.jsx';
 import { WalletButton } from '../components/WalletButton.jsx';
 import WorldChannel from '../components/WorldChannel.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
+import { useUserTheme } from '../lib/theme.js';
 
 export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
   const { wallet } = useAuth();
+  const { isDay } = useUserTheme();
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(null); // 'create' | 'join' | null
@@ -82,9 +85,9 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center relative overflow-hidden">
-      {/* Nền rừng cố định + phủ nhẹ */}
+      {/* Nền rừng cố định + phủ theo theme NGƯỜI DÙNG chọn (sáng/tối) */}
       <div className="forest-bg" />
-      <div className="forest-overlay-day" />
+      <div className={isDay ? 'forest-overlay-day' : 'forest-overlay-night'} />
       <div className="scanlines opacity-20" />
 
       <div className="relative z-10 w-full flex flex-col items-center p-margin-mobile md:px-margin-desktop md:py-stack-lg min-h-screen">
@@ -99,6 +102,8 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
             </span>
           </div>
           <div className="flex items-center gap-stack-md">
+            {/* Toggle sáng/tối — chỉ áp cho NGOÀI game (theo người dùng) */}
+            <ThemeToggle />
             {/* Nút Profile — hiện tên tài khoản (ví rút gọn) hoặc Guest */}
             <button
               onClick={onOpenProfile}

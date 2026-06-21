@@ -20,7 +20,8 @@ export default function DevPanel({ context = 'game' }) {
   if (!import.meta.env.DEV) return null;
 
   const socket = getSocket();
-  const [open, setOpen] = useState(true);
+  // Mặc định THU GỌN (chỉ nút DEV nhỏ) cho gọn màn hình — bấm mới bung panel.
+  const [open, setOpen] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoRef = useRef(null);
 
