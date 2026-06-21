@@ -1,0 +1,26 @@
+{
+  "name": "aionewolf-backend",
+  "version": "1.0.0",
+  "description": "Backend real-time cho game Ma Sói AIoneWolf (Express 5 + socket.io + Solana wallet auth)",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "sim": "node mock/sim-game.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.0",
+    "bs58": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.8.3",
+    "tweetnacl": "^1.0.3"
+  }
+}

@@ -124,3 +124,7 @@ dist
 # IDEs
 .idea/
 .vscode/
+
+.agora-skills/
+.claude/
+.ask/

@@ -1,0 +1,22 @@
+{
+  "name": "aionewolf-ai",
+  "version": "1.0.0",
+  "description": "AI Quan tro (Game Master) cho game Ma Soi AIoneWolf — Custom-LLM proxy cho Agora Conversational AI: nghe nguoi choi noi -> boc lenh (function-calling) -> goi REST backend -> noi lai ket qua (TTS).",
+  "main": "tool-server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node tool-server.js",
+    "dev": "node tool-server.js",
+    "mock:backend": "node mock/fake-backend.js",
+    "sim:night": "node mock/sim-night.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}
