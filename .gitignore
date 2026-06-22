@@ -130,3 +130,5 @@ skills-lock.json
 .claude/
 .ask/
 .agents/
+
+_bak_node_modules/
