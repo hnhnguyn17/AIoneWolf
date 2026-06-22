@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
       // 4. Gửi verify, nhận JWT.
       const result = await verifySignature({ wallet, signature, message });
 
-      const next = { token: result.token, wallet: result.wallet || wallet };
+      const next = { token: result.token, wallet: result.wallet || wallet, user: result.user };
       setAuth(next);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       setStatus('idle');
@@ -93,6 +93,7 @@ export function AuthProvider({ children }) {
     auth,
     token: auth?.token || null,
     wallet: auth?.wallet || null,
+    user: auth?.user || null,
     isAuthed: !!auth?.token,
     status,
     error,

@@ -16,9 +16,11 @@ import { WalletButton } from '../components/WalletButton.jsx';
 import WorldChannel from '../components/WorldChannel.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useUserTheme } from '../lib/theme.js';
+import { usePWAInstall } from '../lib/usePWAInstall.js';
 
 export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
-  const { wallet } = useAuth();
+  const { wallet, user } = useAuth();
+  const { isInstallable, promptInstall } = usePWAInstall();
   const { isDay } = useUserTheme();
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
@@ -111,10 +113,10 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
             >
               <span className="material-symbols-outlined text-surface-tint text-[20px]">account_circle</span>
               <span className="font-button text-button normal-case">
-                {wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : 'Guest'}
+                {user?.name ? user.name : (wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : 'Guest')}
               </span>
             </button>
-            <WalletButton />
+            <WalletButton>{user?.name}</WalletButton>
           </div>
         </header>
 
@@ -162,7 +164,28 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
         </div>
 
         {/* PANEL Tạo / Tham gia */}
-        <main className="w-full max-w-2xl flex flex-col gap-4">
+        <main className="w-full max-w-4xl xl:max-w-5xl px-4 md:px-0 flex flex-col gap-4">
+          
+          {isInstallable && (
+            <div className="glass-panel p-4 rounded-xl flex items-center justify-between border-surface-tint/40 glow-cyan">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-surface-tint text-3xl">download</span>
+                <div>
+                  <h3 className="font-button text-on-surface text-[16px]">Cài đặt App</h3>
+                  <p className="font-body-md text-on-surface-variant text-sm hidden md:block">
+                    Cài đặt Echoes of the Lycan vào màn hình chính để chơi toàn màn hình mượt mà hơn.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={promptInstall}
+                className="bg-surface-tint text-void font-button px-5 py-2.5 rounded hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                Cài đặt ngay
+              </button>
+            </div>
+          )}
+
           <section className="glass-panel rounded-xl p-6 md:p-8 grid md:grid-cols-2 gap-6 md:gap-8">
             {/* Tạo phòng */}
             <div className="flex flex-col gap-4">
