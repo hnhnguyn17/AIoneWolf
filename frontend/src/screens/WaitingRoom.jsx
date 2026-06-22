@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getSocket, isMock, S2C } from '../lib/socket.js';
+import { getSocket, S2C } from '../lib/socket.js';
 import AvatarCircle from '../components/AvatarCircle.jsx';
 import DevPanel from '../components/DevPanel.jsx';
 import { PLAYER_STATUS } from '../lib/contracts.js';
@@ -11,7 +11,6 @@ import RolePackagePicker from '../components/RolePackagePicker.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useUserTheme } from '../lib/theme.js';
 
-const SELF_ID = 'p1';
 
 export default function WaitingRoom({ onStart, onLeave }) {
   const { isDay } = useUserTheme();
@@ -35,11 +34,6 @@ export default function WaitingRoom({ onStart, onLeave }) {
     }
     socket.on(S2C.ROOM_STATE, onRoomState);
     socket.on(S2C.ROOM_CREATED, onCreated);
-    if (isMock()) {
-      // Trong mock: _bootstrapLobby phát lại room:state hiện tại (phòng đã được tạo
-      // bởi LobbyScreen qua ROOM_CREATE). Không tạo phòng lại ở đây.
-      socket._bootstrapLobby?.();
-    }
     return () => {
       socket.off(S2C.ROOM_STATE, onRoomState);
       socket.off(S2C.ROOM_CREATED, onCreated);
@@ -52,13 +46,13 @@ export default function WaitingRoom({ onStart, onLeave }) {
     name: p.name || `Player_${i + 1}`,
     avatar: p.avatar,
     wallet: p.wallet,
-    self: p.id ? (isMock() ? p.id === SELF_ID : p.id === socket.id) : p.seat === room?.selfSeat,
+    self: p.id ? p.id === socket.id : p.seat === room?.selfSeat,
     status: PLAYER_STATUS.ALIVE,
   }));
 
-  const code = room?.roomCode || room?.code || (isMock() ? '------' : '------');
+  const code = room?.roomCode || room?.code || '------';
   const hostSeat = room?.hostSeat ?? 1;
-  const isHost = isMock() ? (room?.hostId || SELF_ID) === SELF_ID : isCreated;
+  const isHost = isCreated;
 
   const inviteLink = `http://localhost:3000/?room=${code}`;
   const totalRoles = Object.values(roleCounts).reduce((a, b) => a + b, 0);
@@ -143,7 +137,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
         </div>
 
         <div className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-widest z-20">
-          {isMock() ? 'MODE: MOCK' : isHost ? 'CHỦ PHÒNG' : 'WAITING ROOM'}
+          {isHost ? 'CHỦ PHÒNG' : 'WAITING ROOM'}
         </div>
       </header>
 

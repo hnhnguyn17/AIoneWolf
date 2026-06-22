@@ -10,7 +10,7 @@
  * (mock hoặc thật).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getSocket, isMock, C2S, S2C } from '../lib/socket.js';
+import { getSocket, C2S, S2C } from '../lib/socket.js';
 import { useAuth } from '../lib/auth.jsx';
 import { WalletButton } from '../components/WalletButton.jsx';
 import WorldChannel from '../components/WorldChannel.jsx';
@@ -252,7 +252,7 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
           <footer className="flex items-center justify-center gap-2 mt-2">
             <div className="w-2 h-2 rounded-full bg-surface-tint animate-pulse" />
             <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
-              {isMock() ? 'MODE: MOCK / NO BACKEND' : 'NODE: SECURE / CLUSTER: DEVNET'}
+              NODE: SECURE / CLUSTER: DEVNET
             </span>
           </footer>
         </main>
