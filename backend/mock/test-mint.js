@@ -82,9 +82,33 @@ async function runTest() {
   const umiSigner = createSignerFromKeypair(umi, umiKeypair);
   umi.use(keypairIdentity(umiSigner));
 
-  // 4. Định nghĩa ví nhận NFT thử nghiệm (ở đây dùng ví Backend nhận luôn để tiện check)
-  const recipient = backendKeypair.publicKey.toBase58();
-  const badgeType = 'THO_SAN';
+  // 4. Định nghĩa ví nhận NFT thử nghiệm & Loại Badge
+  let recipient = process.env.USER_WALLET;
+  let badgeType = 'THO_SAN';
+
+  const args = process.argv.slice(2);
+  const validBadges = ['THO_SAN', 'MA_SOI', 'CHUA_TE'];
+
+  if (args.length === 1) {
+    if (validBadges.includes(args[0].toUpperCase())) {
+      badgeType = args[0].toUpperCase();
+    } else {
+      recipient = args[0];
+    }
+  } else if (args.length >= 2) {
+    recipient = args[0];
+    if (validBadges.includes(args[1].toUpperCase())) {
+      badgeType = args[1].toUpperCase();
+    }
+  }
+
+  if (!recipient) {
+    recipient = backendKeypair.publicKey.toBase58();
+    console.log(`🎯 Chưa cấu hình USER_WALLET trong .env. Tự động dùng ví Backend nhận: ${recipient}`);
+  } else {
+    console.log(`🎯 Địa chỉ ví nhận NFT: ${recipient}`);
+  }
+  console.log(`🎯 Loại NFT Badge: ${badgeType}`);
 
   console.log(`\n🚀 Đang tiến hành tạo NFT Badge [${badgeType}] gửi đến: ${recipient}...`);
 
@@ -107,6 +131,15 @@ async function runTest() {
     console.log(`   https://explorer.solana.com/tx/${txSig}?cluster=devnet`);
     console.log(`🔍 Xem chi tiết NFT tại Solana Explorer:`);
     console.log(`   https://explorer.solana.com/address/${assetSigner.publicKey.toString()}?cluster=devnet`);
+
+    // Lưu vào SQLite local database
+    const db = require('../src/db/store');
+    try {
+      db.saveNft(recipient, assetSigner.publicKey.toString(), badgeType, txSig);
+      console.log('💾 Đã lưu thông tin NFT vào cơ sở dữ liệu SQLite local.');
+    } catch (dbErr) {
+      console.error('⚠️  Không thể lưu NFT vào SQLite DB:', dbErr.message);
+    }
   } catch (err) {
     console.error('❌ Đúc NFT thất bại:', err);
   }
