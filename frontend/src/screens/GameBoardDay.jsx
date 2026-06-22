@@ -17,6 +17,7 @@ import GMSpeechBubble from '../components/GMSpeechBubble.jsx';
 import Countdown from '../components/Countdown.jsx';
 import { ROLE_LABEL, PHASE, PLAYER_STATUS } from '../lib/contracts.js';
 import * as agora from '../lib/agora.js';
+import VoteTally from '../components/VoteTally.jsx';
 
 export default function GameBoardDay({ session, onExit }) {
   const {
@@ -111,8 +112,8 @@ export default function GameBoardDay({ session, onExit }) {
           </div>
         </div>
 
-        {/* Vòng avatar — thu nhỏ theo chiều cao để vừa 1 màn không scroll */}
-        <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+        {/* Vòng avatar + bảng kiểm phiếu (khi VOTE) */}
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4 relative">
           <AvatarCircle
             players={players}
             sizeClass="w-[min(52vh,440px)]"
@@ -128,6 +129,12 @@ export default function GameBoardDay({ session, onExit }) {
               )
             }
           />
+          {/* VoteTally nổi góc phải dưới khi pha VOTE */}
+          {inVotePhase && Object.keys(vote.tally).length > 0 && (
+            <div className="absolute bottom-4 right-4 z-10">
+              <VoteTally players={players} tally={vote.tally} youVoted={vote.youVoted} />
+            </div>
+          )}
         </div>
 
         {/* Bottom bar: mic (thoại) ở giữa; nút VOTE/Kêu gọi theo pha */}

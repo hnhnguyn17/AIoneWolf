@@ -378,3 +378,9 @@ body {
   background-color: #00dbe7 !important;
   color: #0a0a0b !important;
 }
+
+/* ── Panel overlay trượt lên (NightScreen Kênh Sói + các modal) ── */
+@keyframes slideUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}

@@ -22,7 +22,16 @@ const mid = () => `c${Date.now()}_${_mid++}`;
 
 export function useGameSession() {
   const socket = useRef(getSocket()).current;
-  const [players, setPlayers] = useState(isMock() ? seedPlayers() : []);
+  const [players, setPlayers] = useState(() => {
+    if (socket._lastRoomState?.players) {
+      return socket._lastRoomState.players.map((p) => ({
+        ...p,
+        status: PLAYER_STATUS.ALIVE,
+        role: p.role || null,
+      }));
+    }
+    return isMock() ? seedPlayers() : [];
+  });
   const [phase, setPhase] = useState(PHASE.LOBBY);
   const [cycle, setCycle] = useState(1);
   const [deadline, setDeadline] = useState(null); // epoch ms cho đếm ngược pha
@@ -30,6 +39,7 @@ export function useGameSession() {
   const [gmSpeech, setGmSpeech] = useState(null); // { text, tone }
   const [role, setRole] = useState(null);
   const [vote, setVote] = useState({ tally: {}, youVoted: null });
+  const [nightPrompt, setNightPrompt] = useState(null); // { action, role } khi tới lượt vai
 
   // seat (index) đang nói — nghe từ agora.onSpeaking (mock phát qua setSpeaking).
   const [speakingSeat, setSpeakingSeat] = useState(null);
@@ -54,6 +64,8 @@ export function useGameSession() {
       if (state?.phase) setPhase(state.phase);
     }
     function onPhase({ phase: p, cycle: c, deadline: d }) {
+      // Khi ra khỏi đêm → clear nightPrompt.
+      if (p && p !== PHASE.NIGHT) setNightPrompt(null);
       if (p) setPhase(p);
       if (c != null) setCycle(c);
       setDeadline(d ?? null);
@@ -109,6 +121,9 @@ export function useGameSession() {
         ts: Date.now(),
       });
     }
+    function onNightPrompt({ action, role: r }) {
+      setNightPrompt({ action, role: r });
+    }
 
     function lookupName(id) {
       const p = (isMock() ? MOCK.players : players).find((x) => x.id === id);
@@ -127,6 +142,7 @@ export function useGameSession() {
     socket.on(S2C.PLAYER_DIED, onDied);
     socket.on(S2C.VOTE_UPDATE, onVote);
     socket.on(S2C.SEER_RESULT, onSeer);
+    socket.on(S2C.NIGHT_PROMPT, onNightPrompt);
 
     return () => {
       socket.off(S2C.ROOM_STATE, onRoomState);
@@ -137,6 +153,7 @@ export function useGameSession() {
       socket.off(S2C.PLAYER_DIED, onDied);
       socket.off(S2C.VOTE_UPDATE, onVote);
       socket.off(S2C.SEER_RESULT, onSeer);
+      socket.off(S2C.NIGHT_PROMPT, onNightPrompt);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket]);
@@ -149,6 +166,9 @@ export function useGameSession() {
   }
   function startGame() {
     socket.emit(C2S.GAME_START, {});
+  }
+  function nightAction(targetId) {
+    socket.emit(C2S.NIGHT_ACTION, { targetId });
   }
 
   // id người chơi đang nói (đổi từ seat index → id để UI so khớp).
@@ -168,6 +188,8 @@ export function useGameSession() {
     sendChat,
     castVote,
     startGame,
+    nightPrompt,
+    nightAction,
   };
 }
 

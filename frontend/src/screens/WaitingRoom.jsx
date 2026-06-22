@@ -35,7 +35,11 @@ export default function WaitingRoom({ onStart, onLeave }) {
     }
     socket.on(S2C.ROOM_STATE, onRoomState);
     socket.on(S2C.ROOM_CREATED, onCreated);
-    if (isMock()) socket._bootstrapLobby?.();
+    if (isMock()) {
+      // Trong mock: _bootstrapLobby phát lại room:state hiện tại (phòng đã được tạo
+      // bởi LobbyScreen qua ROOM_CREATE). Không tạo phòng lại ở đây.
+      socket._bootstrapLobby?.();
+    }
     return () => {
       socket.off(S2C.ROOM_STATE, onRoomState);
       socket.off(S2C.ROOM_CREATED, onCreated);
@@ -52,7 +56,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
     status: PLAYER_STATUS.ALIVE,
   }));
 
-  const code = room?.roomCode || room?.code || (isMock() ? 'ABYSS1' : '------');
+  const code = room?.roomCode || room?.code || (isMock() ? '------' : '------');
   const hostSeat = room?.hostSeat ?? 1;
   const isHost = isMock() ? (room?.hostId || SELF_ID) === SELF_ID : isCreated;
 
@@ -349,7 +353,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
         onClose={() => setAddOpen(false)}
       />
 
-      <DevPanel context="waiting" fillCount={totalRoles} onRunTest={start} />
+      <DevPanel context="waiting" fillCount={totalRoles} onRunTest={start} onPickScenario={() => start()} />
     </div>
   );
 }

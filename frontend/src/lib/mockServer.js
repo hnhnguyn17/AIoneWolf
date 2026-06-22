@@ -13,6 +13,11 @@
  * → người chết → vote. Trong DAY_DISCUSS/VOTE còn phát "ai đang nói" qua
  * agora.setSpeaking(seat,bool) để bật speaking indicator kiểu Google Meet.
  *
+ * CƠ CHẾ PHÒNG (mới):
+ *   - Vào phòng ban đầu CHỈ có MÌNH BẠN (p1). Bấm "Fill bots" mới thêm người.
+ *   - ROOM_CREATE: sinh MÃ PHÒNG MỚI + reset số người + reset ván.
+ *   - ROOM_JOIN (Kênh Thế Giới): vào với tư cách KHÁCH (host là bot, không sửa vai).
+ *
  * Dùng đúng tên event trong contracts.js (C2S / S2C).
  */
 import { C2S, S2C, PHASE, ROLE, ROLE_LABEL, PLAYER_STATUS } from './contracts.js';
@@ -22,7 +27,16 @@ import * as agora from './agora.js';
 const AVA = (seed) =>
   `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${seed}&backgroundColor=0a0a0b`;
 
-const MOCK_ROOM_CODE = 'ABYSS1';
+// Sinh mã phòng ngẫu nhiên (bỏ I/O/0/1 cho dễ đọc) — mỗi lần TẠO PHÒNG 1 mã mới.
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genRoomCode() {
+  let c = '';
+  for (let i = 0; i < 6; i += 1) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return c;
+}
+
+// Giữ cả hằng MOCK_ROOM_CODE để tương thích với MOCK.roomCode (sẽ đồng bộ qua getter).
+let _currentRoomCode = genRoomCode();
 
 // Mỗi pha thảo luận/đêm kéo dài 30s (deadline để UI đếm ngược).
 const PHASE_MS = 30_000;
@@ -77,6 +91,11 @@ export function createMockSocket() {
   let cycle = 1;
   let scenario = DEFAULT_SCENARIO; // 'WOLF' | 'SEER' | 'WITCH' (DEV chọn)
 
+  // ── Trạng thái PHÒNG CHờ ─────────────────────────────
+  let roomCode = _currentRoomCode;   // mã phòng hiện tại
+  let hostId = 'p1';                  // p1 = bạn làm chủ; nếu là khách → bot làm chủ
+  let joinedIds = ['p1'];             // ai đang trong phòng (khởi đầu chỉ mình bạn)
+
   function on(event, fn) {
     if (!handlers.has(event)) handlers.set(event, new Set());
     handlers.get(event).add(fn);
@@ -100,13 +119,18 @@ export function createMockSocket() {
     console.log('%c[mock C2S]', 'color:#7318ff', event, payload);
     switch (event) {
       case C2S.ROOM_CREATE:
-        // Tạo phòng → phát room:created (kèm hostId = self) rồi room:state.
+        // TẠO PHÒNG MỚI: mã mới, reset về 1 mình bạn, reset ván.
+        resetRoom({ asHost: true });
+        roomCode = genRoomCode();
+        _currentRoomCode = roomCode;
         after(120, () => {
-          emitToClient(S2C.ROOM_CREATED, { code: MOCK_ROOM_CODE, hostId: 'p1' });
+          emitToClient(S2C.ROOM_CREATED, { code: roomCode, roomCode, hostId: 'p1' });
           pushRoomState();
         });
         break;
       case C2S.ROOM_JOIN:
+        // VÀO PHÒNG (Kênh Thế Giới) với tư cách KHÁCH.
+        joinAsGuest(payload?.code || payload?.roomCode);
         after(120, () => pushRoomState());
         break;
       case C2S.GAME_START:
@@ -153,18 +177,12 @@ export function createMockSocket() {
     }
   }
 
-  /** DEV: thêm bot vào phòng cho đủ `count` người (tối đa 18). */
+  /** DEV: thêm bot vào phòng cho đủ `count` người. */
   function fillBots(count) {
-    const target = Math.min(18, Math.max(players.length, count));
-    const BOT_NAMES = ['Vex', 'Rune', 'Onyx', 'Spectre', 'Cinder', 'Drift', 'Hex', 'Pulse'];
-    let bi = 0;
-    while (players.length < target) {
-      const n = players.length + 1;
-      const name = `BOT_${BOT_NAMES[bi++ % BOT_NAMES.length]}`;
-      players.push({
-        id: `bot${n}`, name, avatar: AVA(name),
-        status: PLAYER_STATUS.ALIVE, role: null, bot: true,
-      });
+    const target = Math.min(PLAYERS.length, count || 8);
+    for (const p of PLAYERS) {
+      if (joinedIds.length >= target) break;
+      if (!joinedIds.includes(p.id)) joinedIds.push(p.id);
     }
   }
 
@@ -173,12 +191,40 @@ export function createMockSocket() {
     if (skipFn) skipFn();
   }
 
+  /** Reset phòng về trạng thái sạch (1 mình bạn hoặc chuẩn bị join). */
+  function resetRoom({ asHost = true } = {}) {
+    started = false;
+    cycle = 1;
+    skipFn = null;
+    stopSpeaking();
+    timers.forEach(clearTimeout);
+    timers.length = 0;
+    players.forEach((p) => { p.status = PLAYER_STATUS.ALIVE; p.role = null; });
+    hostId = asHost ? 'p1' : hostId;
+    joinedIds = ['p1'];
+  }
+
+  /** VÀO PHÒNG KHÁCH: host là bot p2, có sẵn vài người, bạn (p1) là khách. */
+  function joinAsGuest(code) {
+    resetRoom({ asHost: false });
+    if (code) roomCode = String(code).toUpperCase();
+    hostId = 'p2';                  // chủ phòng là người khác → bạn KHÔNG sửa được vai
+    joinedIds = ['p2', 'p3', 'p4', 'p1']; // vài người có sẵn + bạn vào sau
+  }
+
   function pushRoomState() {
+    // Chỉ gửi những người đang trong phòng (joinedIds).
+    const inRoom = joinedIds
+      .map((id) => players.find((p) => p.id === id))
+      .filter(Boolean)
+      .map(({ role, ...rest }) => rest); // ẩn role ở lobby
     emitToClient(S2C.ROOM_STATE, {
-      code: MOCK_ROOM_CODE,
+      code: roomCode,
+      roomCode,
       phase: PHASE.LOBBY,
-      hostId: 'p1',
-      players: players.map(({ role, ...rest }) => rest), // ẩn role ở lobby
+      hostId,
+      players: inRoom,
+      ts: Date.now(),
     });
   }
 
@@ -247,6 +293,9 @@ export function createMockSocket() {
     if (started) return;
     started = true;
 
+    // Đảm bảo đủ 8 người để kịch bản chạy (nếu chưa fill bot thì tự fill).
+    fillBots(8);
+
     // Vai theo KỊCH BẢN đã chọn (DEV). Người chơi (p1) đóng vai tương ứng.
     const roles = SCENARIO_ROLES[scenario] || SCENARIO_ROLES[DEFAULT_SCENARIO];
     players.forEach((p) => { p.role = roles[p.id] || ROLE.VILLAGER; });
@@ -275,7 +324,7 @@ export function createMockSocket() {
         // Lộ role cho 2 con sói để client biết đồng đội (mergePlayers giữ field role).
         const wolves = players.filter((p) => roles[p.id] === ROLE.WEREWOLF);
         emitToClient(S2C.ROOM_STATE, {
-          code: MOCK_ROOM_CODE,
+          code: roomCode,
           players: players.map((p) => ({
             id: p.id,
             role: roles[p.id] === ROLE.WEREWOLF ? ROLE.WEREWOLF : undefined,
@@ -297,138 +346,287 @@ export function createMockSocket() {
           ? buildWitchSteps()
           : buildSeerSteps();
 
-    // Kịch bản 8 người — Dân thắng sau 4 ngày 3 đêm:
-    //  Sống đầu: p1..p8 (8)
-    //  N1 Sói cắn Wraith(p4)        → 7
-    //  D1 làng vote nhầm Ghost(p3)  → 6  (sai: Ghost là Dân)
-    //  N2 Sói cắn Synapse(p6)       → 5
-    //  D2 Tiên tri lật Null_01(p2)  → 4  (đúng: treo Sói)
-    //  N3 Sói cuối cắn Echo_X(p5)   → 3
-    //  D3 làng treo Vortex(p7)      → 2  (Sói cuối cùng)
-    //  D4 GAME OVER — Dân (Tiên tri + Phù thủy) thắng.
-    const steps = [
-      // ── Chia vai ──────────────────────────────────────────
-      { gap: 300, run: () => {
-        phase(PHASE.ASSIGN_ROLES);
-        emitToClient(S2C.ROLE_ASSIGNED, { playerId: 'p1', role: roles.p1 });
-        gm('Vai trò đã được phân định cho 8 người chơi. Hãy ghi nhớ thân phận của ngươi.');
-      } },
+    // ── Helper: vote tăng dần trong pha VOTE để UI chạy số + countdown ──
+    function rampVote(finalTally, youVoted) {
+      after(VOTE_MS * 0.3, () => {
+        const half = {};
+        for (const k in finalTally) half[k] = Math.max(1, Math.ceil(finalTally[k] / 2));
+        emitToClient(S2C.VOTE_UPDATE, { tally: half, youVoted: null });
+      });
+      after(VOTE_MS * 0.7, () =>
+        emitToClient(S2C.VOTE_UPDATE, { tally: finalTally, youVoted: youVoted ?? null }),
+      );
+    }
 
-      // ── ĐÊM 1 ─────────────────────────────────────────────
-      { gap: 1500, run: () => {
-        cycle = 1;
-        phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
-        gm('Đêm 1 buông xuống. Lưới điện ngắt. Phe Sói thức giấc...', { tone: 'night' });
-        after(600, () => chat('p2', 'Hai ta khởi đầu. Đừng để lộ.', 'WOLF'));
-        after(1200, () => chat('p7', 'Hạ Wraith trước — gã hay soi mói.', 'WOLF'));
-        after(1800, () => chat('p2', 'Chốt. Wraith đêm nay.', 'WOLF'));
-        // Tiên tri (bạn) soi Null_01 → là Sói.
-        after(2400, () => emitToClient(S2C.SEER_RESULT, { targetId: 'p2', isWerewolf: true }));
-      } },
-      // ── NGÀY 1 ────────────────────────────────────────────
-      { gap: NIGHT_MS, run: () => {
-        kill('p4', 'WEREWOLF');
-        phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
-        gm('Bình minh Ngày 1. Làng tỉnh giấc...', { tone: 'day' });
-        gm(`Mất tín hiệu từ [${nameOf('p4')}]. Sinh hiệu: âm tính.`, { tone: 'alert' });
-      } },
-      { gap: ANNOUNCE_MS, run: () => {
-        phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
-        runSpeaking();
-        chat('p3', 'Wraith chết rồi. Ai khả nghi nhất?');
-        after(1100, () => chat('p7', 'Tôi nghi Ghost — nãy giờ né tránh.'));
-        after(2200, () => chat('p2', 'Đồng ý, Ghost rất đáng ngờ.'));
-        after(3300, () => chat('p6', 'Chưa có bằng chứng mà... nhưng thôi.'));
-      } },
-      { gap: DISCUSS_MS, run: () => {
-        phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
-        gm('Đã đến lúc phán xét. Bỏ phiếu loại một kẻ tình nghi.');
-        emitToClient(S2C.VOTE_UPDATE, { tally: { p3: 3, p6: 1 }, youVoted: null });
-      } },
-      { gap: VOTE_MS, run: () => {
-        emitToClient(S2C.VOTE_UPDATE, { tally: { p3: 5, p6: 1 }, youVoted: 'p3' });
-        kill('p3', 'VOTE');
-        gm(`Làng đã quyết. [${nameOf('p3')}] bị trục xuất... nhưng hắn chỉ là DÂN. Một sai lầm.`, { tone: 'alert' });
-      } },
+    // ── KỊCH BẢN SÓI: bạn (p1) là Sói cùng p2 ──────────────────
+    function buildWolfSteps() {
+      return [
+        { gap: 300, run: () => {
+          phase(PHASE.ASSIGN_ROLES); revealRoles();
+          gm('Vai trò đã phân định. Ngươi là SÓI — cùng đồng bọn săn mồi.');
+        } },
+        { gap: 1200, run: () => {
+          cycle = 1; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 1. Phe Sói thức giấc. Hãy chọn con mồi.', { tone: 'night' });
+          nightPrompt('KILL');
+          after(700, () => chat('p2', 'Đồng bọn, đêm nay hạ ai?', 'WOLF'));
+          after(1600, () => chat('p2', 'Tôi nghiêng về Wraith — gã lắm lời.', 'WOLF'));
+        } },
+        { gap: NIGHT_MS, run: () => {
+          kill('p4', 'WEREWOLF');
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 1.', { tone: 'day' });
+          gm(`Mất tín hiệu từ [${nameOf('p4')}]. Sinh hiệu: âm tính.`, { tone: 'alert' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p3', 'Wraith chết rồi. Phải tìm ra Sói.');
+          after(1500, () => chat('p5', 'Cẩn thận, đừng treo nhầm dân.'));
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Bỏ phiếu treo cổ một kẻ tình nghi.');
+          rampVote({ p3: 4, p6: 2 }, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p3', 'VOTE');
+          gm(`[${nameOf('p3')}] bị trục xuất — chỉ là DÂN. Sói vẫn ẩn mình.`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 2; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 2. Tiếp tục đi săn.', { tone: 'night' });
+          nightPrompt('KILL');
+          after(800, () => chat('p2', 'Hạ Synapse cho chắc.', 'WOLF'));
+        } },
+        { gap: NIGHT_MS, run: () => {
+          kill('p6', 'WEREWOLF');
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 2.', { tone: 'day' });
+          gm(`Mất tín hiệu từ [${nameOf('p6')}].`, { tone: 'alert' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p3', 'Tôi là Tiên tri! Tôi soi ra Null_01 là Sói!');
+          after(1500, () => chat('p2', 'Hắn nói dối! Tôi mới là dân.'));
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Làng nghi ngờ Null_01...');
+          rampVote({ p2: 3, p1: 1 }, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p2', 'VOTE');
+          gm(`[${nameOf('p2')}] bị treo — đồng bọn của ngươi đã ngã xuống.`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 3; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 3. Ngươi là Sói cuối cùng. Hạ kẻ nguy hiểm nhất.', { tone: 'night' });
+          nightPrompt('KILL');
+        } },
+        { gap: NIGHT_MS, run: () => {
+          kill('p5', 'WEREWOLF');
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 3.', { tone: 'day' });
+          gm(`Mất tín hiệu từ [${nameOf('p5')}] — Bảo vệ đã chết.`, { tone: 'alert' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p5', 'Mất Tiên tri rồi... ai là Sói cuối?');
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Phán xét.');
+          rampVote({ p8: 2, p1: 1 }, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p8', 'VOTE');
+          gm(`[${nameOf('p8')}] bị treo nhầm. Phe Sói áp đảo!`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 4; phase(PHASE.GAME_OVER, { cycle });
+          emitToClient(S2C.GAME_OVER, { winner: 'WEREWOLF' });
+          gm('Ngày 4 — Phe Sói thắng. Làng không thể cản đàn Sói trong bóng tối.', { tone: 'night' });
+        } },
+      ];
+    }
 
-      // ── ĐÊM 2 ─────────────────────────────────────────────
-      { gap: 2000, run: () => {
-        stopSpeaking();
-        cycle = 2;
-        phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
-        gm('Đêm 2. Bầy Sói lại đi săn...', { tone: 'night' });
-        after(700, () => chat('p7', 'Làng đang loạn. Hạ Synapse cho chắc.', 'WOLF'));
-        after(1400, () => chat('p2', 'Ừ. Phù thủy chắc đã dùng thuốc rồi.', 'WOLF'));
-        // Tiên tri soi tiếp Vortex → cũng là Sói.
-        after(2100, () => emitToClient(S2C.SEER_RESULT, { targetId: 'p7', isWerewolf: true }));
-      } },
-      // ── NGÀY 2 ────────────────────────────────────────────
-      { gap: NIGHT_MS, run: () => {
-        kill('p6', 'WEREWOLF');
-        phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
-        gm('Bình minh Ngày 2.', { tone: 'day' });
-        gm(`Mất tín hiệu từ [${nameOf('p6')}]. Sinh hiệu: âm tính.`, { tone: 'alert' });
-      } },
-      { gap: ANNOUNCE_MS, run: () => {
-        phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
-        runSpeaking();
-        chat('p1', 'Tôi là Tiên tri. Tôi đã soi: Null_01 LÀ Sói. Đừng nghi oan nữa.');
-        after(1200, () => chat('p2', 'Vu khống! Hắn giả Tiên tri để gài tôi.'));
-        after(2400, () => chat('p8', 'Tôi là Phù thủy — tôi tin Tiên tri. Dồn phiếu Null_01.'));
-        after(3500, () => chat('p7', '...', 'GLOBAL'));
-      } },
-      { gap: DISCUSS_MS, run: () => {
-        phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
-        gm('Bỏ phiếu lần hai. Niềm tin đặt vào Tiên tri.');
-        emitToClient(S2C.VOTE_UPDATE, { tally: { p2: 3 }, youVoted: null });
-      } },
-      { gap: VOTE_MS, run: () => {
-        emitToClient(S2C.VOTE_UPDATE, { tally: { p2: 4, p1: 1 }, youVoted: 'p2' });
-        kill('p2', 'VOTE');
-        gm(`[${nameOf('p2')}] bị trục xuất. Hắn ĐÚNG là SÓI. Làng gỡ lại một bàn.`, { tone: 'alert' });
-      } },
+    // ── KỊCH BẢN TIÊN TRI: bạn (p1) soi mỗi đêm ────────────────
+    function buildSeerSteps() {
+      return [
+        { gap: 300, run: () => {
+          phase(PHASE.ASSIGN_ROLES); revealRoles();
+          gm('Vai trò đã phân định. Ngươi là TIÊN TRI — mỗi đêm soi một người.');
+        } },
+        { gap: 1200, run: () => {
+          cycle = 1; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 1. Hãy chọn một người để soi tỏ thân phận.', { tone: 'night' });
+          nightPrompt('CHECK');
+          after(2200, () => emitToClient(S2C.SEER_RESULT, { targetId: 'p2', isWerewolf: true }));
+        } },
+        { gap: NIGHT_MS, run: () => {
+          kill('p3', 'WEREWOLF');
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 1.', { tone: 'day' });
+          gm(`Mất tín hiệu từ [${nameOf('p3')}].`, { tone: 'alert' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p1', 'Tôi đã soi Null_01 — hắn LÀ Sói.', 'GLOBAL');
+          after(1200, () => chat('p8', 'Tin Tiên tri! Dồn phiếu Null_01.'));
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Bỏ phiếu.');
+          rampVote({ p2: 4, p1: 1 }, 'p2');
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p2', 'VOTE');
+          gm(`[${nameOf('p2')}] bị treo — ĐÚNG là Sói. Lời Tiên tri ứng nghiệm.`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 2; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 2. Soi tiếp một kẻ khả nghi.', { tone: 'night' });
+          nightPrompt('CHECK');
+          after(2200, () => emitToClient(S2C.SEER_RESULT, { targetId: 'p7', isWerewolf: true }));
+        } },
+        { gap: NIGHT_MS, run: () => {
+          kill('p4', 'WEREWOLF');
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 2.', { tone: 'day' });
+          gm(`Mất tín hiệu từ [${nameOf('p4')}].`, { tone: 'alert' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p1', 'Vortex cũng là Sói — tôi đã soi đêm qua!', 'GLOBAL');
+          after(1500, () => chat('p8', 'Tin Tiên tri! Dồn phiếu Vortex.'));
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Phán xét Vortex.');
+          rampVote({ p7: 4 }, 'p7');
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p7', 'VOTE');
+          gm(`[${nameOf('p7')}] bị treo — Sói cuối cùng!`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 3; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 3. Bầy Sói đã tan, nhưng hãy cứ canh chừng.', { tone: 'night' });
+          nightPrompt('CHECK');
+          after(2200, () => emitToClient(S2C.SEER_RESULT, { targetId: 'p5', isWerewolf: false }));
+        } },
+        { gap: NIGHT_MS, run: () => {
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 3. Đêm qua bình yên — không ai chết.', { tone: 'day' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p8', 'Hết Sói rồi! Tiên tri công lớn.');
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Không còn ai để nghi — làng bỏ phiếu trắng.');
+          rampVote({}, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          stopSpeaking(); cycle = 4; phase(PHASE.GAME_OVER, { cycle });
+          emitToClient(S2C.GAME_OVER, { winner: 'VILLAGE' });
+          gm('Ngày 4 — Phe Dân thắng. Tiên tri đã dẫn làng tới chiến thắng.', { tone: 'day' });
+        } },
+      ];
+    }
 
-      // ── ĐÊM 3 ─────────────────────────────────────────────
-      { gap: 2000, run: () => {
-        stopSpeaking();
-        cycle = 3;
-        phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
-        gm('Đêm 3. Con Sói cuối cùng tuyệt vọng dồn đòn...', { tone: 'night' });
-        after(900, () => chat('p7', 'Một mình rồi. Phải hạ Echo_X — gã Bảo vệ.', 'WOLF'));
-      } },
-      // ── NGÀY 3 ────────────────────────────────────────────
-      { gap: NIGHT_MS, run: () => {
-        kill('p5', 'WEREWOLF');
-        phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
-        gm('Bình minh Ngày 3.', { tone: 'day' });
-        gm(`Mất tín hiệu từ [${nameOf('p5')}]. Sinh hiệu: âm tính.`, { tone: 'alert' });
-      } },
-      { gap: ANNOUNCE_MS, run: () => {
-        phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
-        runSpeaking();
-        chat('p1', 'Đêm 2 tôi đã soi Vortex — hắn cũng LÀ Sói. Hắn là tên cuối!');
-        after(1300, () => chat('p8', 'Khớp hết. Treo Vortex là xong.'));
-      } },
-      { gap: DISCUSS_MS, run: () => {
-        phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
-        gm('Phán xét cuối cùng.');
-        emitToClient(S2C.VOTE_UPDATE, { tally: { p7: 2 }, youVoted: null });
-      } },
-      { gap: VOTE_MS, run: () => {
-        emitToClient(S2C.VOTE_UPDATE, { tally: { p7: 2 }, youVoted: 'p7' });
-        kill('p7', 'VOTE');
-        gm(`[${nameOf('p7')}] bị trục xuất. Hắn là con SÓI cuối cùng.`, { tone: 'alert' });
-      } },
-
-      // ── NGÀY 4: kết thúc ──────────────────────────────────
-      { gap: 2000, run: () => {
-        stopSpeaking();
-        cycle = 4;
-        phase(PHASE.GAME_OVER, { cycle });
-        emitToClient(S2C.GAME_OVER, { winner: 'VILLAGE' });
-        gm('Ngày 4 — Phe Dân Làng chiến thắng. Tiên tri và Phù thủy sống sót. Vực Thẳm yên giấc.', { tone: 'day' });
-      } },
-    ];
+    // ── KỊCH BẢN PHÙ THỦY: bạn (p1) có bình cứu + bình độc ──────
+    function buildWitchSteps() {
+      return [
+        { gap: 300, run: () => {
+          phase(PHASE.ASSIGN_ROLES); revealRoles();
+          gm('Vai trò đã phân định. Ngươi là PHÙ THỦY — 1 bình cứu, 1 bình độc.');
+        } },
+        { gap: 1200, run: () => {
+          cycle = 1; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 1. Phe Sói ra tay... Ngươi có thể CỨU nạn nhân.', { tone: 'night' });
+          after(1500, () => gm(`Đêm nay [${nameOf('p4')}] bị Sói tấn công.`, { tone: 'alert' }));
+          after(1800, () => nightPrompt('SAVE'));
+        } },
+        { gap: NIGHT_MS, run: () => {
+          // Phù thủy CỨU p4 → đêm 1 không ai chết.
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 1. Bình cứu đã phát huy — không ai thiệt mạng!', { tone: 'day' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p4', 'Tôi suýt chết... ai đó đã cứu tôi. Cảm ơn!');
+          after(1500, () => chat('p3', 'Phù thủy còn sống. Tốt.'));
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Bỏ phiếu một kẻ tình nghi.');
+          rampVote({ p6: 3, p2: 2 }, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p6', 'VOTE');
+          gm(`[${nameOf('p6')}] bị treo — chỉ là dân. Đáng tiếc.`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 2; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 2. Hết bình cứu. Ngươi có thể dùng bình ĐỘC giết một kẻ.', { tone: 'night' });
+          nightPrompt('POISON');
+        } },
+        { gap: NIGHT_MS, run: () => {
+          kill('p4', 'WEREWOLF');   // Sói cắn p4
+          kill('p2', 'POISON');     // Phù thủy độc trúng Sói p2
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 2.', { tone: 'day' });
+          gm(`Mất tín hiệu từ [${nameOf('p4')}].`, { tone: 'alert' });
+          gm(`[${nameOf('p2')}] gục chết vì độc dược — và hắn LÀ Sói!`, { tone: 'alert' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p3', 'Phù thủy độc trúng Sói! Còn một con nữa.');
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Truy tìm Sói cuối.');
+          rampVote({ p7: 3, p5: 1 }, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          kill('p7', 'VOTE');
+          gm(`[${nameOf('p7')}] bị treo — Sói cuối cùng đã ngã!`, { tone: 'alert' });
+        } },
+        { gap: 2000, run: () => {
+          stopSpeaking(); cycle = 3; phase(PHASE.NIGHT, { cycle, duration: NIGHT_MS });
+          gm('Đêm 3. Bình an — Sói đã bị diệt sạch.', { tone: 'night' });
+        } },
+        { gap: NIGHT_MS, run: () => {
+          phase(PHASE.DAY_ANNOUNCE, { cycle, duration: ANNOUNCE_MS });
+          gm('Bình minh Ngày 3. Không ai chết.', { tone: 'day' });
+        } },
+        { gap: ANNOUNCE_MS, run: () => {
+          phase(PHASE.DAY_DISCUSS, { cycle, duration: DISCUSS_MS });
+          runSpeaking();
+          chat('p3', 'Chiến thắng nhờ Phù thủy!');
+        } },
+        { gap: DISCUSS_MS, run: () => {
+          phase(PHASE.VOTE, { cycle, duration: VOTE_MS });
+          gm('Làng bỏ phiếu trắng — không còn Sói.');
+          rampVote({}, null);
+        } },
+        { gap: VOTE_MS, run: () => {
+          stopSpeaking(); cycle = 4; phase(PHASE.GAME_OVER, { cycle });
+          emitToClient(S2C.GAME_OVER, { winner: 'VILLAGE' });
+          gm('Ngày 4 — Phe Dân thắng. Bình cứu và bình độc đã xoay chuyển ván cờ.', { tone: 'day' });
+        } },
+      ];
+    }
 
     // Bộ chạy step: hẹn giờ step kế; skipFn ép chạy ngay (bỏ chờ).
     let idx = 0;
@@ -467,6 +665,9 @@ export function createMockSocket() {
     },
     // tiện ích cho FE: ép gửi room state (vào lobby ngay).
     _bootstrapLobby: pushRoomState,
+    // DEV: đọc/đặt kịch bản hiện tại (WOLF/SEER/WITCH).
+    get _scenario() { return scenario; },
+    _setScenario(s) { if (SCENARIO_ROLES[s]) scenario = s; },
   };
 
   // Giả lập connect bất đồng bộ.
@@ -480,7 +681,8 @@ export function createMockSocket() {
 }
 
 export const MOCK = {
-  roomCode: MOCK_ROOM_CODE,
+  // getter để luôn trả mã phòng hiện tại (thay đổi khi tạo phòng mới).
+  get roomCode() { return _currentRoomCode; },
   players: PLAYERS,
 };
 

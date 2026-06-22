@@ -13,7 +13,7 @@
  * 'dev:skip_phase'. Ở backend thật các event này bị bỏ qua (vô hại).
  */
 import { useEffect, useRef, useState } from 'react';
-import { getSocket } from '../lib/socket.js';
+import { getSocket, isMock } from '../lib/socket.js';
 
 /**
  * @param {string}   context   'waiting' | 'game' — đổi nút hiển thị theo màn.
@@ -21,11 +21,12 @@ import { getSocket } from '../lib/socket.js';
  * @param {()=>void} onRunTest callback "chạy thử quy trình": fill bot xong → bắt
  *                             đầu ván & vào màn game (WaitingRoom truyền start()).
  */
-export default function DevPanel({ context = 'game', fillCount = 8, onRunTest }) {
+export default function DevPanel({ context = 'game', fillCount = 8, onRunTest, onPickScenario }) {
   // GUARD CỨNG: production tuyệt đối không render.
   if (!import.meta.env.DEV) return null;
 
   const socket = getSocket();
+  const mock = isMock();
   // Mặc định THU GỌN (chỉ nút DEV nhỏ) cho gọn màn hình — bấm mới bung panel.
   const [open, setOpen] = useState(false);
   const [auto, setAuto] = useState(false);
@@ -50,14 +51,28 @@ export default function DevPanel({ context = 'game', fillCount = 8, onRunTest })
     setConfirmRun(false);
   }
 
+  // Chọn kịch bản theo vai → set scenario, fill bots, rồi vào ván.
+  function pickScenario(key) {
+    socket.emit('dev:set_scenario', { scenario: key });
+    socket.emit('dev:fill_bots', { count: fillCount });
+    setTimeout(() => (onPickScenario ? onPickScenario(key) : onRunTest?.()), 250);
+  }
+
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-3 left-3 z-[100] bg-on-tertiary-container/90 text-white text-[11px] font-data-mono px-2 py-1 rounded uppercase tracking-widest"
-      >
-        DEV
-      </button>
+      <div className="fixed bottom-3 left-3 z-[100] flex items-center gap-2">
+        <button
+          onClick={() => setOpen(true)}
+          className="bg-on-tertiary-container/90 text-white text-[11px] font-data-mono px-2 py-1 rounded uppercase tracking-widest"
+        >
+          DEV
+        </button>
+        {mock && (
+          <span className="bg-green-500/90 text-black text-[11px] font-data-mono px-2 py-1 rounded uppercase tracking-widest">
+            MOCK
+          </span>
+        )}
+      </div>
     );
   }
 
@@ -67,6 +82,9 @@ export default function DevPanel({ context = 'game', fillCount = 8, onRunTest })
         <span className="text-on-tertiary-container uppercase tracking-widest flex items-center gap-1">
           <span className="material-symbols-outlined text-[14px]">bug_report</span>
           Dev Tools
+          {mock && (
+            <span className="ml-1 bg-green-500/90 text-black px-1.5 rounded text-[10px]">MOCK</span>
+          )}
         </span>
         <button onClick={() => setOpen(false)} className="text-on-surface-variant hover:text-error">
           ✕
@@ -117,6 +135,39 @@ export default function DevPanel({ context = 'game', fillCount = 8, onRunTest })
               <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
               Chạy thử quy trình
             </button>
+          )}
+
+          {/* 3 nút kịch bản theo vai — chỉ hiện ở chế độ MOCK */}
+          {mock && (
+            <div className="mb-2 pt-2 border-t border-outline-variant/30">
+              <p className="text-outline-variant mb-1.5 leading-snug">
+                Kịch bản theo vai (8 người · 4N3Đ):
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  onClick={() => pickScenario('WOLF')}
+                  className="bg-red-500/15 border border-red-500/50 text-red-400 py-1.5 rounded uppercase tracking-tight text-[10px] hover:bg-red-500/25 transition-colors flex flex-col items-center gap-0.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">pets</span>
+                  Sói
+                </button>
+                <button
+                  onClick={() => pickScenario('SEER')}
+                  className="bg-cyan-500/15 border border-cyan-500/50 text-cyan-400 py-1.5 rounded uppercase tracking-tight text-[10px] hover:bg-cyan-500/25 transition-colors flex flex-col items-center gap-0.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                  Tiên tri
+                </button>
+                <button
+                  onClick={() => pickScenario('WITCH')}
+                  className="bg-purple-500/15 border border-purple-500/50 text-purple-400 py-1.5 rounded uppercase tracking-tight text-[10px] hover:bg-purple-500/25 transition-colors flex flex-col items-center gap-0.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">science</span>
+                  Phù thủy
+                </button>
+              </div>
+              <p className="text-outline-variant/60 text-[9px] mt-1 text-center">F5 để đổi kịch bản</p>
+            </div>
           )}
         </>
       )}
