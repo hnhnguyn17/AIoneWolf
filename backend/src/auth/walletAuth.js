@@ -140,7 +140,8 @@ router.get('/me', (req, res) => {
   const user = db.getUser(payload.wallet);
   const rank = user ? db.getRank(user.elo) : null;
   const history = user ? db.matchHistory(payload.wallet, 10) : [];
-  return res.json({ wallet: payload.wallet, user: user ? { ...user, rank } : null, history });
+  const nfts = user ? db.getUserNfts(payload.wallet) : [];
+  return res.json({ wallet: payload.wallet, user: user ? { ...user, rank } : null, history, nfts });
 });
 
 // GET /auth/leaderboard — bảng xếp hạng ELO (public)

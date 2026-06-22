@@ -59,12 +59,17 @@ export default function ProfileVault({ onBack }) {
   // Giá SOL realtime + số dư ví thật.
   const [sol, setSol] = useState(null);     // { usd, change24h }
   const [balance, setBalance] = useState(null); // số SOL trong ví
+  // Danh sách NFT thực tế từ on-chain/DB
+  const [nfts, setNfts] = useState([]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       const me = await getMe(token);
-      if (alive && me?.user) setUser({ ...FALLBACK_USER, ...me.user });
+      if (alive) {
+        if (me?.user) setUser({ ...FALLBACK_USER, ...me.user });
+        if (me?.nfts) setNfts(me.nfts);
+      }
     })();
     return () => { alive = false; };
   }, [token]);
@@ -95,7 +100,7 @@ export default function ProfileVault({ onBack }) {
 
   // Ledger: dòng đầu là số dư ví thật (nếu có), còn lại là demo onchain.
   const balUsd = balance != null && sol?.usd ? balance * sol.usd : null;
-  const LEDGER = [
+  const baseLedger = [
     balance != null
       ? {
           kind: 'Balance', icon: 'account_balance_wallet',
@@ -108,10 +113,53 @@ export default function ProfileVault({ onBack }) {
           amount: '— SOL', sub: 'kết nối ví', tone: 'text-outline',
           when: 'devnet', tx: shortAddr, status: 'IDLE',
         },
-    { kind: 'Mint', icon: 'token', amount: 'Cranial Node Alpha', tone: 'text-secondary', when: '4 hrs ago', tx: '2mY…4pW', status: 'SUCCESS' },
     { kind: 'Receive', icon: 'call_received', amount: '+5.00 SOL', tone: 'text-primary', when: '1 day ago', tx: '8xK…9qL', status: 'SUCCESS' },
     { kind: 'Stake', icon: 'token', amount: '10,000 ABYSS', tone: 'text-secondary', when: '2 days ago', tx: '9bX…3cC', status: 'SUCCESS' },
   ];
+
+  // Trộn các giao dịch mint NFT thật vào Ledger
+  const LEDGER = [...baseLedger];
+  if (nfts.length > 0) {
+    nfts.forEach((n) => {
+      const badgeNames = {
+        'THO_SAN': 'Lycan Hunter Badge',
+        'MA_SOI': 'Alpha Werewolf Badge',
+        'CHUA_TE': 'Lord of the Abyss Badge'
+      };
+      LEDGER.splice(1, 0, {
+        kind: 'Mint',
+        icon: 'token',
+        amount: badgeNames[n.badge] || `${n.badge} Badge`,
+        tone: 'text-secondary',
+        when: 'mới đây',
+        tx: `${n.tx.slice(0, 4)}…${n.tx.slice(-4)}`,
+        status: 'SUCCESS',
+        fullTx: n.tx,
+      });
+    });
+  }
+
+  // Chuẩn bị danh sách NFT hiển thị trong Vault
+  const displayNfts = nfts.length > 0 ? nfts.map((n, i) => {
+    const badgeNames = {
+      'THO_SAN': 'Lycan Hunter',
+      'MA_SOI': 'Alpha Werewolf',
+      'CHUA_TE': 'Lord of the Abyss'
+    };
+    const badgeRarities = {
+      'THO_SAN': 'RARE',
+      'MA_SOI': 'EPIC',
+      'CHUA_TE': 'LEGENDARY'
+    };
+    return {
+      id: n.mint,
+      name: badgeNames[n.badge] || `${n.badge} Badge`,
+      rarity: badgeRarities[n.badge] || 'COMMON',
+      img: `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${n.mint}&backgroundColor=0a0a0b`,
+      isReal: true,
+      tx: n.tx,
+    };
+  }) : NFTS.map((nft) => ({ ...nft, isReal: false }));
 
   const changeUp = (sol?.change24h ?? 0) >= 0;
 
@@ -221,12 +269,17 @@ export default function ProfileVault({ onBack }) {
             <div className="flex items-center gap-4 mb-6 border-b border-outline-variant/30 pb-2">
               <span className="material-symbols-outlined text-primary">grid_view</span>
               <h3 className="font-headline-md text-[24px] text-on-surface">The Vault</h3>
-              <div className="ml-auto hud-text">ITEMS: {NFTS.length}</div>
+              <div className="ml-auto hud-text">ITEMS: {displayNfts.length}</div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {NFTS.map((nft) => (
+              {displayNfts.map((nft) => (
                 <div
                   key={nft.id}
+                  onClick={() => {
+                    if (nft.isReal && nft.id) {
+                      window.open(`https://explorer.solana.com/address/${nft.id}?cluster=devnet`, '_blank');
+                    }
+                  }}
                   className="glass-panel nft-card relative aspect-[3/4] overflow-hidden cursor-pointer group rounded-sm"
                 >
                   <div
@@ -234,7 +287,7 @@ export default function ProfileVault({ onBack }) {
                       nft.rarity,
                     )}`}
                   >
-                    {nft.rarity}
+                    {nft.rarity} {nft.isReal ? '✦ ON-CHAIN' : '✦ PREVIEW'}
                   </div>
                   <img
                     src={nft.img}
@@ -244,7 +297,7 @@ export default function ProfileVault({ onBack }) {
                   <div className="card-overlay absolute inset-0 flex flex-col justify-end p-4">
                     <span className="font-headline-md text-[16px] text-on-surface">{nft.name}</span>
                     <span className="font-label-sm text-[10px] text-surface-tint uppercase tracking-widest">
-                      The Vault · #{nft.id}
+                      {nft.isReal ? `Mint: ${nft.id.slice(0, 4)}…${nft.id.slice(-4)}` : `The Vault · #${nft.id}`}
                     </span>
                   </div>
                 </div>
@@ -308,7 +361,16 @@ export default function ProfileVault({ onBack }) {
                     <span className="font-label-sm text-[10px] text-on-surface-variant">
                       {tx.when}
                     </span>
-                    <span className="font-label-sm text-[10px] text-outline-variant hover:text-primary transition-colors cursor-pointer">
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const signature = tx.fullTx || tx.tx;
+                        if (signature && signature.length > 10) {
+                          window.open(`https://explorer.solana.com/tx/${signature}?cluster=devnet`, '_blank');
+                        }
+                      }}
+                      className="font-label-sm text-[10px] text-outline-variant hover:text-primary transition-colors cursor-pointer"
+                    >
                       Tx: {tx.tx}
                     </span>
                   </div>

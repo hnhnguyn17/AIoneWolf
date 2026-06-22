@@ -126,5 +126,7 @@ dist
 .vscode/
 
 .agora-skills/
+skills-lock.json
 .claude/
 .ask/
+.agents/

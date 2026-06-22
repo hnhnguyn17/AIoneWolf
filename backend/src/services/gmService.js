@@ -120,13 +120,26 @@ function createGmService(io) {
 
   function _recordEloForRoom(room, winner) {
     try {
+      const { mintCoreNftOnchain } = require('./solana/mintBadge');
       room.players.forEach((p) => {
         if (!p.wallet) return;
         const won = p.team === winner;
-        db.recordResult(p.wallet, {
+        const result = db.recordResult(p.wallet, {
           role: p.role, team: p.team, won,
           survived: p.status === PLAYER_STATUS.ALIVE,
         });
+
+        // Nếu người chơi đạt mốc NFT, thực hiện đúc (bất đồng bộ)
+        if (result && result.nft) {
+          console.log(`[Game Over] Người chơi ${p.name} (${p.wallet}) đạt mốc NFT: ${result.nft}. Đang tiến hành mint...`);
+          mintCoreNftOnchain(p.wallet, result.nft)
+            .then(({ mint, tx }) => {
+              console.log(`[Game Over] Tự động mint thành công cho ${p.name}. Mint: ${mint}, Tx: ${tx}`);
+            })
+            .catch((err) => {
+              console.error(`[Game Over] Tự động mint thất bại cho ${p.name}:`, err.message);
+            });
+        }
       });
     } catch (e) {
       console.error('recordEloForRoom lỗi:', e.message);

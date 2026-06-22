@@ -95,6 +95,19 @@ db.exec(`
 db.exec(`CREATE INDEX IF NOT EXISTS idx_att_wallet ON attendance(wallet, active);`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_att_room ON attendance(roomCode, active);`);
 
+// Bảng nfts: lưu trữ thông tin NFT đã đúc (ví, địa chỉ mint, loại badge, tx signature, thời gian)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS nfts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet      TEXT NOT NULL,
+    mint        TEXT NOT NULL UNIQUE,
+    badge       TEXT NOT NULL,
+    tx          TEXT NOT NULL,
+    mintedAt    TEXT NOT NULL
+  );
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_nfts_wallet ON nfts(wallet);`);
+
 // Migration nhẹ: nếu DB cũ thiếu cột streak thì thêm (bỏ qua nếu đã có)
 for (const col of ['winStreak', 'bestStreak']) {
   try { db.exec(`ALTER TABLE users ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`); } catch { /* đã có */ }
@@ -119,6 +132,13 @@ const qSessRevokeWallet = db.prepare('UPDATE sessions SET revoked = 1 WHERE wall
 // matches (lịch sử)
 const qMatchInsert = db.prepare('INSERT INTO matches (wallet, role, won, delta, eloAfter, playedAt) VALUES (?, ?, ?, ?, ?, ?)');
 const qMatchByWallet = db.prepare('SELECT * FROM matches WHERE wallet = ? ORDER BY id DESC LIMIT ?');
+
+// nfts (NFT đã đúc)
+const qNftInsert = db.prepare(
+  `INSERT INTO nfts (wallet, mint, badge, tx, mintedAt)
+   VALUES (?, ?, ?, ?, ?)`
+);
+const qNftByWallet = db.prepare('SELECT * FROM nfts WHERE wallet = ? ORDER BY id DESC');
 
 const { computeDelta, applyDelta, getRank, nftMilestone } = require('../game/elo');
 
@@ -301,6 +321,19 @@ function attendanceHistory(wallet, limit = 30) {
   return qAttHistoryByWallet.all(wallet, limit);
 }
 
+/** Lưu thông tin NFT mới đúc thành công. */
+function saveNft(wallet, mint, badge, tx) {
+  const now = new Date().toISOString();
+  qNftInsert.run(wallet, mint, badge, tx, now);
+  return { wallet, mint, badge, tx, mintedAt: now };
+}
+
+/** Lấy danh sách NFT của ví. */
+function getUserNfts(wallet) {
+  if (!wallet) return [];
+  return qNftByWallet.all(wallet);
+}
+
 module.exports = {
   getUser, upsertUser, recordResult, leaderboard, matchHistory, setStats,
   createSession, getSession, revokeSession, revokeAllSessions,
@@ -309,5 +342,7 @@ module.exports = {
   // attendance
   activeRoomOf, joinAttendance, leaveAttendanceWallet, leaveAttendanceRoom,
   roomAttendance, attendanceHistory,
+  // nfts
+  saveNft, getUserNfts,
   getRank, DB_FILE,
 };
