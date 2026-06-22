@@ -17,7 +17,7 @@ import WorldChannel from '../components/WorldChannel.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useUserTheme } from '../lib/theme.js';
 
-export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
+export default function LobbyScreen({ onEnterWaiting, onOpenProfile, onLogout }) {
   const { wallet } = useAuth();
   const { isDay } = useUserTheme();
   const [code, setCode] = useState('');
@@ -115,6 +115,16 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile }) {
               </span>
             </button>
             <WalletButton />
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 px-3 py-2 rounded-full border border-outline-variant/40 bg-surface-container/40 text-on-surface-variant hover:text-error hover:border-error/60 transition-colors"
+              title="Đăng xuất"
+            >
+              <span className="material-symbols-outlined text-[20px]">logout</span>
+              <span className="font-button text-button normal-case hidden sm:inline">
+                Đăng xuất
+              </span>
+            </button>
           </div>
         </header>
 

@@ -48,7 +48,7 @@ function rarityColor(r) {
 // Fallback data cứng khi chưa đăng nhập / lỗi mạng — demo vẫn đẹp.
 const FALLBACK_USER = { elo: 1840, wins: 37, losses: 12, bestStreak: 9 };
 
-export default function ProfileVault({ onBack }) {
+export default function ProfileVault({ onBack, onLogout }) {
   const { wallet, token } = useAuth();
   const shortAddr = wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : '0x71…4F2e';
 
@@ -131,7 +131,19 @@ export default function ProfileVault({ onBack }) {
         <h1 className="font-display-lg-mobile text-primary uppercase tracking-tighter">
           VOIR_ABYSS
         </h1>
-        <WalletButton />
+        <div className="flex items-center gap-3">
+          <WalletButton />
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-3 py-2 rounded-full border border-outline-variant/40 bg-surface-container/40 text-on-surface-variant hover:text-error hover:border-error/60 transition-colors"
+            title="Đăng xuất"
+          >
+            <span className="material-symbols-outlined text-[20px]">logout</span>
+            <span className="font-button text-button normal-case hidden sm:inline">
+              Đăng xuất
+            </span>
+          </button>
+        </div>
       </header>
 
       <main className="relative z-10 w-full max-w-container-max mx-auto flex flex-col xl:flex-row gap-gutter">

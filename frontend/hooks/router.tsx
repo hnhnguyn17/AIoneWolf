@@ -63,7 +63,7 @@ function LoginRoute({ onGuest }) {
   );
 }
 
-function LobbyRoute() {
+function LobbyRoute({ onLogout }) {
   const navigate = useNavigate();
 
   return (
@@ -77,6 +77,10 @@ function LobbyRoute() {
         navigate(`/room/${code}/wait`);
       }}
       onOpenProfile={() => navigate("/profile")}
+      onLogout={async () => {
+        await onLogout?.();
+        navigate("/", { replace: true });
+      }}
     />
   );
 }
@@ -97,16 +101,29 @@ function WaitingRoomRoute() {
   );
 }
 
-function ProfileRoute() {
+function ProfileRoute({ onLogout }) {
   const navigate = useNavigate();
 
-  return <ProfileVault onBack={() => navigate("/lobby")} />;
+  return (
+    <ProfileVault
+      onBack={() => navigate("/lobby")}
+      onLogout={async () => {
+        await onLogout?.();
+        navigate("/", { replace: true });
+      }}
+    />
+  );
 }
 
 function RouterRoutes() {
-  const { isAuthed } = useAuth();
+  const { isAuthed, logout } = useAuth();
   const [guest, setGuest] = useState(false);
   const loggedIn = isAuthed || guest;
+
+  async function handleLogout() {
+    setGuest(false);
+    await logout();
+  }
 
   return (
     <>
@@ -114,11 +131,11 @@ function RouterRoutes() {
         <Route path="/" element={<LoginRoute onGuest={() => setGuest(true)} />} />
         <Route
           path="/lobby"
-          element={loggedIn ? <LobbyRoute /> : <Navigate to="/" replace />}
+          element={loggedIn ? <LobbyRoute onLogout={handleLogout} /> : <Navigate to="/" replace />}
         />
         <Route
           path="/room/create"
-          element={loggedIn ? <LobbyRoute /> : <Navigate to="/" replace />}
+          element={loggedIn ? <LobbyRoute onLogout={handleLogout} /> : <Navigate to="/" replace />}
         />
         <Route
           path="/room/:roomId/wait"
@@ -134,7 +151,7 @@ function RouterRoutes() {
         />
         <Route
           path="/profile"
-          element={loggedIn ? <ProfileRoute /> : <Navigate to="/" replace />}
+          element={loggedIn ? <ProfileRoute onLogout={handleLogout} /> : <Navigate to="/" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

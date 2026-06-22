@@ -17,6 +17,7 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import { useWallet } from './wallet.jsx';
 import { getNonce, verifySignature } from './api.js';
 import { encodeBase58 } from './base58.js';
+import { disconnectSocket } from './socket.js';
 
 const STORAGE_KEY = 'aionewolf.auth';
 
@@ -82,6 +83,7 @@ export function AuthProvider({ children }) {
     setStatus('idle');
     setError(null);
     localStorage.removeItem(STORAGE_KEY);
+    disconnectSocket();
     try {
       await disconnect?.();
     } catch {
