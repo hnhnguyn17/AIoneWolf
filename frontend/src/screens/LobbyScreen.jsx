@@ -10,15 +10,17 @@
  * (mock hoặc thật).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getSocket, isMock, C2S, S2C } from '../lib/socket.js';
+import { getSocket, C2S, S2C } from '../lib/socket.js';
 import { useAuth } from '../lib/auth.jsx';
 import { WalletButton } from '../components/WalletButton.jsx';
 import WorldChannel from '../components/WorldChannel.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useUserTheme } from '../lib/theme.js';
+import { usePWAInstall } from '../lib/usePWAInstall.js';
 
 export default function LobbyScreen({ onEnterWaiting, onOpenProfile, onLogout }) {
-  const { wallet } = useAuth();
+  const { wallet, user } = useAuth();
+  const { isInstallable, promptInstall } = usePWAInstall();
   const { isDay } = useUserTheme();
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
@@ -111,10 +113,10 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile, onLogout })
             >
               <span className="material-symbols-outlined text-surface-tint text-[20px]">account_circle</span>
               <span className="font-button text-button normal-case">
-                {wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : 'Guest'}
+                {user?.name ? user.name : (wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : 'Guest')}
               </span>
             </button>
-            <WalletButton />
+            <WalletButton>{user?.name}</WalletButton>
             <button
               onClick={onLogout}
               className="flex items-center gap-2 px-3 py-2 rounded-full border border-outline-variant/40 bg-surface-container/40 text-on-surface-variant hover:text-error hover:border-error/60 transition-colors"
@@ -130,9 +132,19 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile, onLogout })
 
         {/* HERO — tên game lớn + tagline */}
         <div className="flex-1 flex flex-col items-center justify-center text-center my-stack-lg">
-          <h1 className="font-display-lg text-[15vw] md:text-[110px] leading-[0.9] text-surface-tint tracking-tighter uppercase drop-shadow-[0_0_30px_rgba(0,219,231,0.45)]">
+          <h1
+            className={`font-display-lg text-[15vw] md:text-[110px] leading-[0.9] tracking-tighter uppercase ${
+              isDay
+                ? 'text-[#06414b] drop-shadow-[0_2px_10px_rgba(255,255,255,0.45)]'
+                : 'text-surface-tint drop-shadow-[0_0_30px_rgba(0,219,231,0.45)]'
+            }`}
+          >
             Echoes
-            <span className="block text-on-surface text-[8vw] md:text-[56px] tracking-[0.2em] mt-1">
+            <span
+              className={`block text-[8vw] md:text-[56px] tracking-[0.2em] mt-1 ${
+                isDay ? 'text-[#08323a]' : 'text-on-surface'
+              }`}
+            >
               of the Lycan
             </span>
           </h1>
@@ -162,7 +174,28 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile, onLogout })
         </div>
 
         {/* PANEL Tạo / Tham gia */}
-        <main className="w-full max-w-2xl flex flex-col gap-4">
+        <main className="w-full max-w-4xl xl:max-w-5xl px-4 md:px-0 flex flex-col gap-4">
+          
+          {isInstallable && (
+            <div className="glass-panel p-4 rounded-xl flex items-center justify-between border-surface-tint/40 glow-cyan">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-surface-tint text-3xl">download</span>
+                <div>
+                  <h3 className="font-button text-on-surface text-[16px]">Cài đặt App</h3>
+                  <p className="font-body-md text-on-surface-variant text-sm hidden md:block">
+                    Cài đặt Echoes of the Lycan vào màn hình chính để chơi toàn màn hình mượt mà hơn.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={promptInstall}
+                className="bg-surface-tint text-void font-button px-5 py-2.5 rounded hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                Cài đặt ngay
+              </button>
+            </div>
+          )}
+
           <section className="glass-panel rounded-xl p-6 md:p-8 grid md:grid-cols-2 gap-6 md:gap-8">
             {/* Tạo phòng */}
             <div className="flex flex-col gap-4">
@@ -229,7 +262,7 @@ export default function LobbyScreen({ onEnterWaiting, onOpenProfile, onLogout })
           <footer className="flex items-center justify-center gap-2 mt-2">
             <div className="w-2 h-2 rounded-full bg-surface-tint animate-pulse" />
             <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
-              {isMock() ? 'MODE: MOCK / NO BACKEND' : 'NODE: SECURE / CLUSTER: DEVNET'}
+              NODE: SECURE / CLUSTER: DEVNET
             </span>
           </footer>
         </main>

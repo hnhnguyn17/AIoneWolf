@@ -103,4 +103,5 @@ export const S2C = {
   CHAT_MSG: 'chat:msg',
   GAME_OVER: 'game:over',
   GM_SPEAK: 'gm:speak',
+  HOST_ROLE_MAP: 'host:roleMap',
 };

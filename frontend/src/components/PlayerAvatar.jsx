@@ -69,11 +69,7 @@ export default function PlayerAvatar({
             className={`w-full h-full rounded-full object-cover ${dead ? 'grayscale' : ''}`}
           />
         )}
-        {dead && (
-          <div className="absolute inset-0 bg-error/20 rounded-full flex items-center justify-center">
-            <span className="material-symbols-outlined text-error">close</span>
-          </div>
-        )}
+        {dead && <div className="dead-mark" />}
         {/* Badge số ghế */}
         <div
           className={`absolute -bottom-2 -right-2 bg-surface-container text-[10px] font-label-sm px-1.5 rounded border ${

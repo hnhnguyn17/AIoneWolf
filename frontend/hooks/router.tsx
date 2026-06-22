@@ -165,9 +165,12 @@ function RouterRoutes() {
   );
 }
 
+import LandscapePrompt from "../src/components/LandscapePrompt.jsx";
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
+      <LandscapePrompt />
       <RouterRoutes />
     </BrowserRouter>
   );

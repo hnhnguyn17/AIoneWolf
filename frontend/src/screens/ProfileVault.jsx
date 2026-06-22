@@ -15,6 +15,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { WalletButton } from '../components/WalletButton.jsx';
 import { getMe, getSolPrice, getSolBalance } from '../lib/api.js';
 import { rankProgress } from '../lib/rank.js';
+import { useUserTheme } from '../lib/theme.js';
 
 import img1 from '../../assets/image.png';
 import img2 from '../../assets/image copy.png';
@@ -49,6 +50,7 @@ function rarityColor(r) {
 const FALLBACK_USER = { elo: 1840, wins: 37, losses: 12, bestStreak: 9 };
 
 export default function ProfileVault({ onBack, onLogout }) {
+  const { isDay } = useUserTheme();
   const { wallet, token } = useAuth();
   const shortAddr = wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : '0x71…4F2e';
 
@@ -115,23 +117,30 @@ export default function ProfileVault({ onBack, onLogout }) {
 
   return (
     <div className="min-h-screen w-full flex flex-col p-margin-mobile md:p-margin-desktop relative">
-      {/* Nền rừng cố định + phủ tối đậm cho dễ đọc */}
+      {/* Nền rừng cố định + phủ theo theme người dùng (sáng/tối) */}
       <div className="forest-bg" />
-      <div className="forest-overlay-night" />
+      <div className={isDay ? 'forest-overlay-day' : 'forest-overlay-night'} />
 
       {/* Top bar */}
       <header className="relative z-10 w-full max-w-container-max mx-auto flex justify-between items-center mb-stack-lg">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-on-surface-variant hover:text-surface-tint transition-colors font-button text-button uppercase tracking-widest"
+          className="flex items-center gap-2 text-on-surface-variant hover:text-surface-tint transition-colors font-button text-button uppercase tracking-widest z-20"
         >
           <span className="material-symbols-outlined">arrow_back</span>
           <span className="hidden md:inline">Lobby</span>
         </button>
-        <h1 className="font-display-lg-mobile text-primary uppercase tracking-tighter">
-          VOIR_ABYSS
-        </h1>
-        <div className="flex items-center gap-3">
+
+        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
+          <h1 className="font-display-lg text-[24px] md:text-[40px] text-surface-tint uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(0,219,231,0.5)] whitespace-nowrap">
+            Echoes of the Lycan
+          </h1>
+          <span className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-[0.3em] mt-1">
+            Hồ Sơ
+          </span>
+        </div>
+
+        <div className="z-20 flex items-center gap-3">
           <WalletButton />
           <button
             onClick={onLogout}

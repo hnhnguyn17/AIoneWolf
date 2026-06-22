@@ -129,17 +129,17 @@ export const ROLE_PACKAGES = [
     desc: 'Tiên tri · Bảo vệ · Phù thuỷ · 3 Sói · 2 Dân',
     counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 3, [ROLE.VILLAGER]: 2 } },
   { id: 'matchmaking12', name: 'Ghép trận 12 người', size: 12,
-    desc: 'Tiên tri · Bảo vệ · Thợ săn · Cupid · Phù thuỷ · 3 Sói · Sói con · 3 Dân',
-    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, HUNTER: 1, CUPID: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 3, WOLF_CUB: 1, [ROLE.VILLAGER]: 3 } },
+    desc: 'Tiên tri · Bảo vệ · Thợ săn · Phù thuỷ · 4 Sói · 4 Dân',
+    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, HUNTER: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 4, [ROLE.VILLAGER]: 4 } },
   { id: 'matchmaking15', name: 'Ghép trận 15 người', size: 15,
-    desc: 'Tiên tri · Bảo vệ · Thợ săn · Cupid · Phù thủy · 3 Sói · Sói Trùm · Sói con · Tiên tri tập sự · 3 Dân',
-    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, HUNTER: 1, CUPID: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 3, BOSS_WOLF: 1, WOLF_CUB: 1, APPRENTICE_SEER: 1, [ROLE.VILLAGER]: 3 } },
+    desc: 'Tiên tri · Bảo vệ · Thợ săn · Phù thủy · 4 Sói · 7 Dân',
+    counts: { [ROLE.SEER]: 1, [ROLE.GUARD]: 1, HUNTER: 1, [ROLE.WITCH]: 1, [ROLE.WEREWOLF]: 4, [ROLE.VILLAGER]: 7 } },
   { id: 'classic6', name: 'Cổ điển 6 người', size: 6,
     desc: '2 Sói · Tiên tri · Bảo vệ · 2 Dân',
     counts: { [ROLE.WEREWOLF]: 2, [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.VILLAGER]: 2 } },
   { id: 'witch8', name: 'Phù thuỷ 8 người', size: 8,
-    desc: '2 Sói · Tiên tri · Bảo vệ · Phù thuỷ · 3 Dân',
-    counts: { [ROLE.WEREWOLF]: 2, [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.WITCH]: 1, [ROLE.VILLAGER]: 3 } },
+    desc: '3 Sói · Tiên tri · Bảo vệ · Phù thuỷ · 2 Dân',
+    counts: { [ROLE.WEREWOLF]: 3, [ROLE.SEER]: 1, [ROLE.GUARD]: 1, [ROLE.WITCH]: 1, [ROLE.VILLAGER]: 2 } },
 ];
 
 export function roleBalanceScore(counts = {}) {

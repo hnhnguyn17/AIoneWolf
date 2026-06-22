@@ -24,6 +24,7 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    host: true,
   },
   // Giúp pre-bundle các dependency Solana mượt hơn.
   optimizeDeps: {

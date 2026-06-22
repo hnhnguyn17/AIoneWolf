@@ -48,7 +48,7 @@ function syncRoomToDb(room, status) {
   }
 }
 
-function registerHandlers(io) {
+function registerHandlers(io, gm) {
   io.on('connection', (socket) => {
     console.log('🔌 connected:', socket.id, socket.wallet ? `(ví ${socket.wallet.slice(0, 6)}…)` : '(guest)');
 
@@ -133,33 +133,23 @@ function registerHandlers(io) {
       if (socket.id !== room.moderatorId) {
         return socket.emit(S2C.ERROR, 'Chỉ Quản trò mới bắt đầu được.');
       }
-      try {
-        room.startGame(roleConfig || null);
-      } catch (e) {
-        return socket.emit(S2C.ERROR, e.message);
-      }
-      // Gửi role RIÊNG cho từng người
-      room.players.forEach((p) => {
-        io.to(p.id).emit(S2C.ROLE_ASSIGNED, { role: p.role, seat: p.seat });
-      });
-      // Vào đêm đầu tiên
-      room.beginNight();
-      if (roleConfig) room.roleConfig = roleConfig;
-      syncRoomToDb(room, 'PLAYING'); // DB: phòng chuyển sang đang chơi
-      io.to(room.roomCode).emit(S2C.PHASE_CHANGED, { phase: room.phase, cycle: room.cycle });
-      io.to(room.roomCode).emit(S2C.ROOM_STATE, room.getPublicState());
+      const r = gm ? gm.startGame(room, roleConfig || null) : (() => {
+        // Fallback nếu không có gm (không nên xảy ra)
+        try { room.startGame(roleConfig || null); return { ok: true }; }
+        catch (e) { return { ok: false, error: e.message }; }
+      })();
+      if (!r.ok) return socket.emit(S2C.ERROR, r.error);
+      syncRoomToDb(room, 'PLAYING');
     });
 
-    // ── Hành động đêm từ client (vd Sói bấm chọn người trên UI) ──
+    // ── Hành động đêm từ client (Sói/Tiên tri/Bảo vệ/Phù thủy bấm UI) ──
     socket.on(C2S.NIGHT_ACTION, ({ action, targetSeat } = {}) => {
       const room = rooms.getRoom(socket.data.roomCode);
       if (!room) return;
-      const r = room.applyNightAction(action, Number(targetSeat));
+      const r = gm
+        ? gm.applyNightAction(room, action, targetSeat, socket.id)
+        : room.applyNightAction(action, Number(targetSeat));
       if (!r.ok) return socket.emit(S2C.ERROR, r.error);
-      // Tiên tri soi: gửi kết quả riêng cho người soi
-      if (action && r.result && r.result.team !== undefined) {
-        socket.emit(S2C.SEER_RESULT, { targetSeat: r.result.targetSeat, team: r.result.team });
-      }
     });
 
     // ── Bỏ phiếu treo cổ ──
@@ -167,9 +157,11 @@ function registerHandlers(io) {
       const room = rooms.getRoom(socket.data.roomCode);
       if (!room) return;
       const seat = socket.data.seat;
-      const r = room.castVote(seat, targetSeat === null ? null : Number(targetSeat));
+      const r = gm
+        ? gm.castVote(room, seat, targetSeat === null ? null : Number(targetSeat))
+        : room.castVote(seat, targetSeat === null ? null : Number(targetSeat));
       if (!r.ok) return socket.emit(S2C.ERROR, r.error);
-      io.to(room.roomCode).emit(S2C.VOTE_UPDATE, { tally: r.result.tally, voter: seat });
+      if (!gm) io.to(room.roomCode).emit(S2C.VOTE_UPDATE, { tally: r.result?.tally, voter: seat });
     });
 
     // ── Chat (chỉ pha cho phép — ban đêm thường bị khóa với dân) ──

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getSocket, isMock, S2C } from '../lib/socket.js';
+import { getSocket, S2C } from '../lib/socket.js';
 import AvatarCircle from '../components/AvatarCircle.jsx';
 import DevPanel from '../components/DevPanel.jsx';
 import { PLAYER_STATUS } from '../lib/contracts.js';
@@ -8,10 +8,12 @@ import {
 } from '../lib/roleCatalog.js';
 import RoleAddPicker from '../components/RoleAddPicker.jsx';
 import RolePackagePicker from '../components/RolePackagePicker.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
+import { useUserTheme } from '../lib/theme.js';
 
-const SELF_ID = 'p1';
 
 export default function WaitingRoom({ onStart, onLeave }) {
+  const { isDay } = useUserTheme();
   const socket = useMemo(() => getSocket(), []);
   const [room, setRoom] = useState(() => socket._lastRoomState || null);
   const [roleCounts, setRoleCounts] = useState(() => ({ ...ROLE_PACKAGES[0].counts }));
@@ -32,7 +34,6 @@ export default function WaitingRoom({ onStart, onLeave }) {
     }
     socket.on(S2C.ROOM_STATE, onRoomState);
     socket.on(S2C.ROOM_CREATED, onCreated);
-    if (isMock()) socket._bootstrapLobby?.();
     return () => {
       socket.off(S2C.ROOM_STATE, onRoomState);
       socket.off(S2C.ROOM_CREATED, onCreated);
@@ -45,13 +46,13 @@ export default function WaitingRoom({ onStart, onLeave }) {
     name: p.name || `Player_${i + 1}`,
     avatar: p.avatar,
     wallet: p.wallet,
-    self: p.id ? (isMock() ? p.id === SELF_ID : p.id === socket.id) : p.seat === room?.selfSeat,
+    self: p.id ? p.id === socket.id : p.seat === room?.selfSeat,
     status: PLAYER_STATUS.ALIVE,
   }));
 
-  const code = room?.roomCode || room?.code || (isMock() ? 'ABYSS1' : '------');
+  const code = room?.roomCode || room?.code || '------';
   const hostSeat = room?.hostSeat ?? 1;
-  const isHost = isMock() ? (room?.hostId || SELF_ID) === SELF_ID : isCreated;
+  const isHost = isCreated;
 
   const inviteLink = `http://localhost:3000/?room=${code}`;
   const totalRoles = Object.values(roleCounts).reduce((a, b) => a + b, 0);
@@ -108,7 +109,7 @@ export default function WaitingRoom({ onStart, onLeave }) {
   return (
     <div className="min-h-screen w-full text-on-surface relative overflow-hidden">
       <div className="forest-bg" />
-      <div className="forest-overlay-night" />
+      <div className={isDay ? 'forest-overlay-day' : 'forest-overlay-night'} />
       <div className="scanlines opacity-30" />
 
       <header className="relative z-10 w-full max-w-[1700px] mx-auto flex justify-between items-center px-margin-mobile md:px-margin-desktop pt-8 md:pt-10">
@@ -119,9 +120,15 @@ export default function WaitingRoom({ onStart, onLeave }) {
           <span className="material-symbols-outlined">arrow_back</span>
           <span className="hidden md:inline">Rời phòng</span>
         </button>
-        
+
         <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
-          <h1 className="font-display-lg text-[24px] md:text-[40px] text-surface-tint uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(0,219,231,0.5)] whitespace-nowrap">
+          <h1
+            className={`font-display-lg text-[24px] md:text-[40px] uppercase tracking-tighter whitespace-nowrap ${
+              isDay
+                ? 'text-[#06414b] drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]'
+                : 'text-surface-tint drop-shadow-[0_0_20px_rgba(0,219,231,0.5)]'
+            }`}
+          >
             Echoes of the Lycan
           </h1>
           <span className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-[0.3em] mt-1">
@@ -130,12 +137,12 @@ export default function WaitingRoom({ onStart, onLeave }) {
         </div>
 
         <div className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-widest z-20">
-          {isMock() ? 'MODE: MOCK' : isHost ? 'CHỦ PHÒNG' : 'WAITING ROOM'}
+          {isHost ? 'CHỦ PHÒNG' : 'WAITING ROOM'}
         </div>
       </header>
 
       <main className="relative z-10 w-full max-w-[1700px] mx-auto px-margin-mobile md:px-margin-desktop mt-8 md:mt-12 pb-stack-lg flex flex-col xl:flex-row gap-gutter">
-        <aside className="w-full xl:w-64 flex flex-col justify-center gap-gutter shrink-0">
+        <aside className="w-full xl:w-64 flex flex-col gap-gutter shrink-0">
           <div className="glass-panel rounded-xl px-4 py-5 flex flex-col gap-5">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-surface-tint">tag</span>
@@ -155,10 +162,18 @@ export default function WaitingRoom({ onStart, onLeave }) {
               <span className="material-symbols-outlined text-[18px]">{copied ? 'check' : 'link'}</span>
               {copied ? 'Đã copy' : 'Copy link mời'}
             </button>
+
+            {/* Mode sáng/tối — điều khiển ngay trong phòng chờ */}
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-outline-variant/30">
+              <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest">
+                Giao diện
+              </span>
+              <ThemeToggle />
+            </div>
           </div>
         </aside>
 
-        <section className="flex-1 relative flex items-center justify-center min-h-[600px] pt-8 md:pt-12 xl:pl-24">
+        <section className="flex-1 relative flex items-start justify-center min-h-[600px] pt-[36px]">
           <AvatarCircle
             players={seats}
             seats={totalRoles}
@@ -325,13 +340,14 @@ export default function WaitingRoom({ onStart, onLeave }) {
       <RoleAddPicker
         open={addOpen}
         allRoles={ALL_ROLES}
+        existingKeys={chosen.map((r) => r.key)}
         teamColor={TEAM_COLOR}
         teamLabel={TEAM_LABEL}
         onAdd={handleAddRoles}
         onClose={() => setAddOpen(false)}
       />
 
-      <DevPanel context="waiting" />
+      <DevPanel context="waiting" fillCount={totalRoles} onRunTest={start} onPickScenario={() => start()} />
     </div>
   );
 }

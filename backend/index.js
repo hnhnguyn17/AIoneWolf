@@ -1,8 +1,7 @@
 /**
  * backend/index.js
- * ─────────────────────────────────────────────────────────────
- * Điểm vào server AIoneWolf: Express + HTTP + Socket.io.
- * Gom: auth ví Solana, REST cho AI Quản trò, Agora token (stub), Solana mint (stub).
+ * AIoneWolf backend (gộp AI Quản trò): Express + Socket.io.
+ * Agora LLM_URL trỏ vào: POST /ai/chat/completions
  */
 
 require('dotenv').config();
@@ -12,11 +11,12 @@ const cors = require('cors');
 const { Server } = require('socket.io');
 
 const { router: authRouter, socketAuthMiddleware } = require('./src/auth/walletAuth');
-const { createGmRouter } = require('./src/routes/gm');
 const agoraRouter = require('./src/routes/agora');
 const roomsRouter = require('./src/routes/rooms');
 const { router: solanaRouter } = require('./src/services/solana/mintBadge');
 const { registerHandlers } = require('./src/socket/handlers');
+const { createGmService } = require('./src/services/gmService');
+const { createAiRouter } = require('./src/routes/ai');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,22 +27,24 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Healthcheck
-app.get('/', (_req, res) => res.json({ name: 'aionewolf-backend', ok: true }));
+// Khởi tạo gmService — cửa mutation duy nhất, inject vào handlers + AI router
+const gm = createGmService(io);
 
 // REST routes
+app.get('/', (_req, res) => res.json({ name: 'aionewolf-backend', ok: true }));
 app.use('/auth', authRouter);
-app.use('/gm', createGmRouter(io));   // inject io để phát socket event ra FE
 app.use('/agora', agoraRouter);
-app.use('/rooms', roomsRouter);       // kênh thế giới + lịch sử chơi
+app.use('/rooms', roomsRouter);
 app.use('/solana', solanaRouter);
+app.use('/ai', createAiRouter(gm));   // Agora ConvoAI LLM_URL → /ai/chat/completions
 
 // Socket.io
 io.use(socketAuthMiddleware);
-registerHandlers(io);
+registerHandlers(io, gm);             // handlers nhận gm để gọi trực tiếp
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3636;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🐺 AIoneWolf backend chạy trên cổng ${PORT}`);
-  console.log(`   REST: /auth /gm /agora /solana   |   Socket.io: ON`);
+  console.log(`🐺 AIoneWolf backend (+ AI Quan tro) chay cong ${PORT}`);
+  console.log(`   REST: /auth /agora /rooms /solana /ai   |   Socket.io: ON`);
+  console.log(`   Agora LLM_URL: http://localhost:${PORT}/ai/chat/completions`);
 });

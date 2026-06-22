@@ -19,6 +19,9 @@ export default function AvatarCircle({
   // seats: tổng số GHẾ của bàn (= số role cấu hình). Nếu > số người thật,
   // các ghế dư hiển thị là "ghế trống đang chờ". Mặc định = số người.
   seats = 0,
+  // sizeClass: lớp Tailwind cho đường kính vòng. Cho phép màn game thu nhỏ
+  // (vd 'w-[min(56vh,460px)]') để vừa 1 màn không scroll.
+  sizeClass = 'w-[min(82vw,600px)]',
   onSelect,
 }) {
   const isAnon = (p) => (typeof anonymous === 'function' ? anonymous(p) : anonymous);
@@ -34,7 +37,7 @@ export default function AvatarCircle({
   const radius = total > 10 ? 47 : 50;
 
   return (
-    <div className="relative w-[min(82vw,600px)] aspect-square rounded-full border border-surface-tint/10 shadow-[inset_0_0_100px_rgba(0,0,0,0.8)] bg-surface-container-highest/5 backdrop-blur-sm flex items-center justify-center">
+    <div className={`relative ${sizeClass} aspect-square rounded-full border border-surface-tint/10 shadow-[inset_0_0_100px_rgba(0,0,0,0.8)] bg-surface-container-highest/5 backdrop-blur-sm flex items-center justify-center`}>
       {/* Tâm vòng tròn (mic / GM) */}
       <div className="z-20 flex items-center justify-center">{center}</div>
 

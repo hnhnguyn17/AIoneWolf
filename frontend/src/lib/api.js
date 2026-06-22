@@ -5,7 +5,7 @@
  * http://localhost:4000, đổi được qua VITE_BACKEND_URL.
  */
 export const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL || 'http://localhost:3636';
+  import.meta.env.VITE_BACKEND_URL || `http://${window.location.hostname}:3636`;
 
 async function fetchBackend(path, options) {
   const url = `${BACKEND_URL}${path}`;

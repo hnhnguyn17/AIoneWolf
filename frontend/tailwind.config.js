@@ -103,9 +103,9 @@ export default {
         'container-max': '1440px',
       },
       fontFamily: {
-        'display-lg': ['Playfair Display', 'serif'],
-        'display-lg-mobile': ['Playfair Display', 'serif'],
-        'headline-md': ['Playfair Display', 'serif'],
+        'display-lg': ['Inter', 'sans-serif'],
+        'display-lg-mobile': ['Inter', 'sans-serif'],
+        'headline-md': ['Inter', 'sans-serif'],
         'body-lg': ['Inter', 'sans-serif'],
         'body-md': ['Inter', 'sans-serif'],
         button: ['Inter', 'sans-serif'],
