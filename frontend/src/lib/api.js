@@ -55,6 +55,24 @@ export async function verifySignature({ wallet, signature, message }) {
   return asJson(res); // { token, wallet }
 }
 
+export async function loginWithEmail({ email, password }) {
+  const res = await fetchBackend('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  return asJson(res);
+}
+
+export async function registerWithEmail({ email, password, name }) {
+  const res = await fetchBackend('/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name }),
+  });
+  return asJson(res);
+}
+
 /**
  * GET /auth/me  (Bearer JWT) → { wallet, user } — hồ sơ user (elo, wins…).
  * Trả null nếu chưa đăng nhập / lỗi mạng (UI tự fallback data cứng).

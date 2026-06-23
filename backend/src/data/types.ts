@@ -21,6 +21,15 @@ export interface SessionRow {
   revoked: number;
 }
 
+export interface AuthAccountRow {
+  email: string;
+  wallet: string;
+  passwordHash: string;
+  passwordSalt: string;
+  createdAt: string;
+  lastLogin: string;
+}
+
 export interface MatchRow {
   id: number;
   wallet: string;

@@ -21,6 +21,17 @@ const REFRESH_TTL_DAYS = 7;
 /** wallet -> { nonce, message, exp }. RAM, 1 process. */
 const _nonces = new Map<string, { message: string; exp: number }>();
 
+export function issueAuthTokens(wallet: string): { accessToken: string; refreshToken: string } {
+  const accessToken = jwt.sign({ wallet }, env.JWT_SECRET, { expiresIn: ACCESS_TTL });
+  const jti = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000).toISOString();
+  createSession({ jti, wallet, expiresAt });
+  const refreshToken = jwt.sign({ wallet, jti }, env.REFRESH_SECRET, {
+    expiresIn: `${REFRESH_TTL_DAYS}d`,
+  });
+  return { accessToken, refreshToken };
+}
+
 export function issueNonce(wallet: string): { nonce: string; message: string } {
   const nonce = crypto.randomBytes(16).toString('hex');
   const message = `Echoes of the Lycan — đăng nhập\nVí: ${wallet}\nNonce: ${nonce}`;
@@ -50,14 +61,7 @@ export function verifySignature(opts: { wallet: string; signature: string; messa
 
   _nonces.delete(opts.wallet); // dùng 1 lần
 
-  const accessToken = jwt.sign({ wallet: opts.wallet }, env.JWT_SECRET, { expiresIn: ACCESS_TTL });
-  const jti = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000).toISOString();
-  createSession({ jti, wallet: opts.wallet, expiresAt });
-  const refreshToken = jwt.sign({ wallet: opts.wallet, jti }, env.REFRESH_SECRET, {
-    expiresIn: `${REFRESH_TTL_DAYS}d`,
-  });
-  return { ok: true, accessToken, refreshToken };
+  return { ok: true, ...issueAuthTokens(opts.wallet) };
 }
 
 /** Xác thực access token → wallet, hoặc null. */

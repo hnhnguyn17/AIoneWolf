@@ -15,7 +15,7 @@
  */
 import { createContext, useCallback, useContext, useState } from 'react';
 import { useWallet } from './wallet.jsx';
-import { getNonce, verifySignature } from './api.js';
+import { getNonce, loginWithEmail, registerWithEmail, verifySignature } from './api.js';
 import { encodeBase58 } from './base58.js';
 import { disconnectSocket } from './socket.js';
 
@@ -37,6 +37,21 @@ export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(loadStored); // { token, wallet } | null
   const [status, setStatus] = useState('idle'); // idle | signing | error
   const [error, setError] = useState(null);
+
+  const persistAuth = useCallback((result) => {
+    const next = {
+      token: result.token || result.accessToken,
+      refreshToken: result.refreshToken || null,
+      wallet: result.wallet || null,
+      email: result.email || null,
+      authType: result.authType || (result.email ? 'email' : 'wallet'),
+      user: result.user || null,
+    };
+    setAuth(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setStatus('idle');
+    return next;
+  }, []);
 
   /**
    * login() — chạy full challenge–response. Yêu cầu ví đã connect.
@@ -65,17 +80,37 @@ export function AuthProvider({ children }) {
       // 4. Gửi verify, nhận JWT.
       const result = await verifySignature({ wallet, signature, message });
 
-      const next = { token: result.token, wallet: result.wallet || wallet, user: result.user };
-      setAuth(next);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setStatus('idle');
-      return next;
+      return persistAuth({ ...result, wallet: result.wallet || wallet, authType: 'wallet' });
     } catch (err) {
       setStatus('error');
       setError(err.message || String(err));
       throw err;
     }
-  }, [publicKey, signMessage]);
+  }, [persistAuth, publicKey, signMessage]);
+
+  const loginPassword = useCallback(async ({ email, password }) => {
+    setStatus('signing');
+    setError(null);
+    try {
+      return persistAuth(await loginWithEmail({ email, password }));
+    } catch (err) {
+      setStatus('error');
+      setError(err.message || String(err));
+      throw err;
+    }
+  }, [persistAuth]);
+
+  const registerPassword = useCallback(async ({ email, password, name }) => {
+    setStatus('signing');
+    setError(null);
+    try {
+      return persistAuth(await registerWithEmail({ email, password, name }));
+    } catch (err) {
+      setStatus('error');
+      setError(err.message || String(err));
+      throw err;
+    }
+  }, [persistAuth]);
 
   /** logout() — xoá session + ngắt ví. */
   const logout = useCallback(async () => {
@@ -95,11 +130,15 @@ export function AuthProvider({ children }) {
     auth,
     token: auth?.token || null,
     wallet: auth?.wallet || null,
+    email: auth?.email || null,
+    authType: auth?.authType || null,
     user: auth?.user || null,
     isAuthed: !!auth?.token,
     status,
     error,
     login,
+    loginPassword,
+    registerPassword,
     logout,
   };
 

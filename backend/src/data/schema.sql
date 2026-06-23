@@ -22,6 +22,17 @@ CREATE TABLE IF NOT EXISTS sessions (
   revoked    INTEGER NOT NULL DEFAULT 0
 );
 
+-- Tài khoản email/password. wallet là id nội bộ dạng "email:<normalized-email>"
+-- để những luồng game/JWT hiện có vẫn dùng cùng khóa users.wallet.
+CREATE TABLE IF NOT EXISTS auth_accounts (
+  email         TEXT PRIMARY KEY,
+  wallet        TEXT NOT NULL UNIQUE,
+  passwordHash  TEXT NOT NULL,
+  passwordSalt  TEXT NOT NULL,
+  createdAt     TEXT NOT NULL,
+  lastLogin     TEXT NOT NULL
+);
+
 -- Lịch sử ván (kết quả mỗi người mỗi ván).
 CREATE TABLE IF NOT EXISTS matches (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,

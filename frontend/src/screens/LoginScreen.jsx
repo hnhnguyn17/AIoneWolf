@@ -14,14 +14,25 @@
  * KHÔNG dùng deeplink mobile. Đây là extension trên trình duyệt desktop,
  * cluster devnet.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useWallet, useWalletModal } from '../lib/wallet.jsx';
 import { useAuth } from '../lib/auth.jsx';
 
 export default function LoginScreen({ onAuthed }) {
   const { publicKey, connecting, connected, wallet } = useWallet();
   const { setVisible } = useWalletModal();
-  const { login, status, error, isAuthed } = useAuth();
+  const {
+    login,
+    loginPassword,
+    registerPassword,
+    status,
+    error,
+    isAuthed,
+  } = useAuth();
+  const [authMode, setAuthMode] = useState('login'); // login | register
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
 
   // Khi đã có JWT → báo lên App để chuyển màn.
   useEffect(() => {
@@ -47,6 +58,21 @@ export default function LoginScreen({ onAuthed }) {
     }
   }
 
+  async function handleEmailSubmit(e) {
+    e.preventDefault();
+    try {
+      const payload = {
+        email,
+        password,
+        name: authMode === 'register' ? name : undefined,
+      };
+      if (authMode === 'register') await registerPassword(payload);
+      else await loginPassword(payload);
+    } catch {
+      /* lỗi đã được hiển thị qua `error` */
+    }
+  }
+
   const primaryLabel = !connected
     ? 'Connect Phantom Wallet'
     : signing
@@ -54,7 +80,7 @@ export default function LoginScreen({ onAuthed }) {
       : 'Sign in to the Abyss';
 
   return (
-    <div className="bg-[#0A0A0B] text-on-surface font-body-md min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="bg-[#0A0A0B] text-on-surface font-body-md min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto">
       {/* Nền rừng forest.png full-screen + PHỦ ĐEN ĐẬM cho card nổi */}
       <div className="forest-bg" />
       <div className="forest-overlay-login" />
@@ -62,7 +88,7 @@ export default function LoginScreen({ onAuthed }) {
       {/* Scanline overlay */}
       <div className="scanlines" />
 
-      <main className="relative z-20 w-full max-w-md px-margin-mobile md:px-0">
+      <main className="relative z-20 w-full max-w-md px-margin-mobile py-8 md:px-0">
         {/* Branding */}
         <div className="text-center mb-12">
           <h1 className="font-display-lg text-display-lg-mobile md:text-display-lg text-surface-tint tracking-tighter drop-shadow-[0_0_15px_rgba(0,219,231,0.5)]">
@@ -84,31 +110,83 @@ export default function LoginScreen({ onAuthed }) {
                 Enter the Abyss
               </h2>
               <p className="font-body-md text-body-md text-on-surface-variant">
-                {connected
-                  ? 'Wallet linked. Sign to authenticate.'
-                  : 'Initialize connection sequence.'}
+                Đăng nhập bằng email hoặc ví Phantom.
               </p>
             </div>
 
-            {/* Primary action: connect → sign */}
-            <button
-              onClick={handlePrimary}
-              disabled={connecting || signing}
-              className="w-full bg-surface-tint text-[#0A0A0B] font-button text-button py-4 px-6 rounded-DEFAULT flex items-center justify-center gap-3 glow-button pulse-anim group disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined fill text-[#0A0A0B]">
-                {connected ? 'verified_user' : 'account_balance_wallet'}
-              </span>
-              <span>{connecting ? 'Connecting…' : primaryLabel}</span>
-            </button>
-
-            {/* Trạng thái ví đã connect */}
-            {connected && shortAddr && (
-              <div className="w-full -mt-4 text-center font-label-sm text-label-sm text-on-surface-variant">
-                {wallet?.adapter?.name ? `${wallet.adapter.name} · ` : ''}
-                {shortAddr}
+            <form onSubmit={handleEmailSubmit} className="w-full flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2 rounded-DEFAULT border border-outline-variant/50 bg-surface-container/30 p-1">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('login')}
+                  className={`py-2 rounded font-button text-button transition-colors ${
+                    authMode === 'login'
+                      ? 'bg-surface-tint text-[#0A0A0B]'
+                      : 'text-on-surface-variant hover:text-surface-tint'
+                  }`}
+                >
+                  Đăng nhập
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('register')}
+                  className={`py-2 rounded font-button text-button transition-colors ${
+                    authMode === 'register'
+                      ? 'bg-surface-tint text-[#0A0A0B]'
+                      : 'text-on-surface-variant hover:text-surface-tint'
+                  }`}
+                >
+                  Đăng ký
+                </button>
               </div>
-            )}
+
+              {authMode === 'register' && (
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Tên hiển thị"
+                  autoComplete="name"
+                  className="w-full bg-surface-container/50 border border-outline-variant/50 rounded px-4 py-3 text-on-surface font-body-md placeholder:text-outline-variant/60 focus:ring-0 focus:border-surface-tint/60 outline-none"
+                />
+              )}
+
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                type="email"
+                autoComplete="email"
+                required
+                className="w-full bg-surface-container/50 border border-outline-variant/50 rounded px-4 py-3 text-on-surface font-body-md placeholder:text-outline-variant/60 focus:ring-0 focus:border-surface-tint/60 outline-none"
+              />
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mật khẩu"
+                type="password"
+                autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
+                minLength={6}
+                required
+                className="w-full bg-surface-container/50 border border-outline-variant/50 rounded px-4 py-3 text-on-surface font-body-md placeholder:text-outline-variant/60 focus:ring-0 focus:border-surface-tint/60 outline-none"
+              />
+
+              <button
+                type="submit"
+                disabled={signing}
+                className="w-full bg-surface-tint text-[#0A0A0B] font-button text-button py-4 px-6 rounded-DEFAULT flex items-center justify-center gap-3 glow-button disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined fill text-[#0A0A0B]">
+                  {authMode === 'register' ? 'person_add' : 'login'}
+                </span>
+                <span>
+                  {signing
+                    ? 'Đang xử lý…'
+                    : authMode === 'register'
+                      ? 'Tạo tài khoản'
+                      : 'Đăng nhập'}
+                </span>
+              </button>
+            </form>
 
             {/* Lỗi */}
             {error && (
@@ -121,10 +199,30 @@ export default function LoginScreen({ onAuthed }) {
             <div className="w-full flex items-center gap-4 py-2">
               <div className="flex-1 h-[1px] bg-outline-variant/50" />
               <span className="font-label-sm text-label-sm text-outline-variant">
-                OR
+                HOẶC
               </span>
               <div className="flex-1 h-[1px] bg-outline-variant/50" />
             </div>
+
+            {/* Primary action: connect → sign */}
+            <button
+              onClick={handlePrimary}
+              disabled={connecting || signing}
+              className="w-full border border-surface-tint text-surface-tint font-button text-button py-3 px-6 rounded-DEFAULT flex items-center justify-center gap-3 hover:bg-surface-tint/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined fill text-surface-tint">
+                {connected ? 'verified_user' : 'account_balance_wallet'}
+              </span>
+              <span>{connecting ? 'Connecting…' : primaryLabel}</span>
+            </button>
+
+            {/* Trạng thái ví đã connect */}
+            {connected && shortAddr && (
+              <div className="w-full -mt-4 text-center font-label-sm text-label-sm text-on-surface-variant">
+                {wallet?.adapter?.name ? `${wallet.adapter.name} · ` : ''}
+                {shortAddr}
+              </div>
+            )}
 
             {/* Guest (chưa nối backend — demo) */}
             <button

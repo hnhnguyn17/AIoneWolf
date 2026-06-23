@@ -51,8 +51,13 @@ const FALLBACK_USER = { elo: 1840, wins: 37, losses: 12, bestStreak: 9 };
 
 export default function ProfileVault({ onBack, onLogout }) {
   const { isDay } = useUserTheme();
-  const { wallet, token } = useAuth();
-  const shortAddr = wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : '0x71…4F2e';
+  const { wallet, token, email, authType } = useAuth();
+  const shortAddr =
+    authType === 'email' && email
+      ? email
+      : wallet
+        ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}`
+        : '0x71…4F2e';
 
   // Hồ sơ ELO: thật từ backend, fallback cứng.
   const [user, setUser] = useState(FALLBACK_USER);
